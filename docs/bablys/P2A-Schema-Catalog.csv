@@ -1,0 +1,43 @@
+domain,proposed_table,key_fields,indexes_and_relations,notes
+Identity,users,existing id; name; email; password,none,Preserve starter; never replace
+Core ACL,cms_roles,id; key; name,unique:key,P2B permission strategy decision
+Core ACL,cms_permissions,id; key; scope,unique:key,Choose native vs package once
+Core ACL,cms_role_user,role_id; user_id,"unique:role_id+user_id; FK:cms_roles,users",Staff roles not auto assigned
+Core ACL,cms_permission_role,permission_id; role_id,"unique:permission_id+role_id; FK:permissions,roles",Role mapping
+Core,cms_audit_events,id; actor_id?; action; subject_type; subject_id; metadata_json,index:subject_type+subject_id; FK:users?,Append-only; redact secrets
+Core,cms_settings,id; namespace; key; json_value; data_type,unique:namespace+key,No API key plaintext
+Navigation,cms_menus,id; key; title; status,unique:key,Assigned to templates
+Navigation,cms_menu_items,id; menu_id; parent_id?; target_type; target; sort_order,FK:cms_menus; index:menu_id+sort_order,Validated targets
+Pages,cms_pages,id; slug; title; status; published_revision_id?,unique:slug; index:status+updated_at,Reserved paths + redirects
+Pages,cms_page_revisions,id; page_id; version; schema_version; blocks_json; author_id,"unique:page_id+version; FK:cms_pages,users",Immutable published snapshots
+Builder,cms_templates,id; key; kind; status; published_revision_id?,unique:key; index:kind+status,Kinds include header/footer
+Builder,cms_template_revisions,id; template_id; version; schema_version; blocks_json; author_id,"unique:template_id+version; FK:cms_templates,users",Validated block registry
+Builder,cms_template_assignments,id; template_id; context_type; context_key; priority,index:context_type+context_key; FK:cms_templates,Deterministic precedence
+Tours,travel_tour_categories,id; parent_id?; name; slug; status; sort_order,unique:slug; FK:self?; index:parent_id,Prevent category cycles
+Tours,travel_destinations,id; name; slug; country_code; status,unique:slug; index:status,Location hierarchy later
+Tours,travel_tours,id; title; slug; status; summary; duration_days; published_at?,unique:slug; index:status+published_at,Publish via workflow
+Tours,travel_tour_category,tour_id; category_id,"unique:tour_id+category_id; FKs:tours,categories",Many-to-many
+Tours,travel_tour_destination,tour_id; destination_id,"unique:tour_id+destination_id; FKs:tours,destinations",Many-to-many
+Tours,travel_tour_itinerary_days,id; tour_id; day_number; title; activities_json,unique:tour_id+day_number; FK:tours,Per-day itinerary
+Tours,travel_tour_departures,id; tour_id; departs_at_utc; timezone; cutoff_at_utc?; status,index:tour_id+departs_at_utc; FK:tours,No fake availability
+Tours,travel_tour_price_options,id; tour_id; label; currency; amount_minor; active,index:tour_id+active; FK:tours,No float prices
+Media,cms_media_assets,id; disk; path; mime; width?; height?; checksum; license; visibility,index:checksum; index:visibility,"Rights, privacy and ownership"
+Media,cms_media_variants,id; asset_id; kind; path; width; height; status,unique:asset_id+kind; FK:assets,Responsive renditions
+Media,cms_media_usages,id; asset_id; subject_type; subject_id; purpose,index:subject_type+subject_id; FK:assets,Allowlisted polymorphic types
+Gallery,cms_gallery_albums,id; slug; title; status; cover_asset_id?,unique:slug; FK:asset?,Optional tour/destination link
+Gallery,cms_gallery_items,id; album_id; asset_id; sort_order; caption_override?,unique:album_id+asset_id; index:album_id+sort_order; FKs,Published-only asset resolution
+Blog,cms_blog_categories,id; slug; title; status,unique:slug,Editorial taxonomy
+Blog,cms_blog_posts,id; slug; title; summary; status; published_revision_id?,unique:slug; index:status+published_at,Authored content + templates
+Blog,cms_blog_post_category,post_id; category_id,unique:post_id+category_id; FKs,Many-to-many
+Blog,cms_blog_post_revisions,id; post_id; version; body_json; author_id,unique:post_id+version; FKs,Immutable public revision
+Reviews,travel_reviews,id; tour_id?; booking_request_id?; rating; body; status; consent_at?,index:tour_id+status; FKs,Only approved public; verified if linked
+Reviews,travel_review_reports,id; review_id; reason; reporter_id?; status,index:review_id+status; FK:reviews,Reports independent of status
+Reviews,travel_review_replies,id; review_id; staff_id; body; status,"FK:reviews,users",Audited staff replies
+Reviews,travel_review_events,id; review_id; actor_id; action; reason,index:review_id+created_at; FKs,Moderation audit
+Bookings,crm_booking_requests,id; tour_id?; departure_id?; contact_fields; status; consent_at?,index:status+created_at; FKs,PII separate from builders
+Bookings,crm_booking_events,id; booking_request_id; actor_id?; from_status; to_status,FK:requests,State history
+Bookings,crm_booking_notes,id; booking_request_id; staff_id; private_note,"FK:requests,users",Restricted private notes
+SEO,seo_metadata,id; resource_type; resource_id; title; description; canonical; robots,unique:resource_type+resource_id,Allowlisted subject type
+SEO,seo_redirects,id; from_path; to_path; http_status; active,unique:from_path,Redirect loops forbidden
+SEO,seo_ai_proposals,id; resource_type; resource_id; prompt_version; proposal_json; status,index:resource_type+resource_id+status,Human reviewed only
+SEO,seo_ai_usage_logs,id; actor_id?; provider; model; token_count; cost_minor?; redacted_metadata,index:created_at,No secret/PII logs

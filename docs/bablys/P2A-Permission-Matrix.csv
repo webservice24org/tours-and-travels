@@ -1,0 +1,29 @@
+module,action,proposed_roles,restriction
+tours,view,administrator;content_editor;designer,Public visibility separate from admin read
+tours,create,administrator;content_editor,
+tours,edit,administrator;content_editor,
+tours,publish,administrator,Separate permission
+taxonomy,manage,administrator;content_editor,Category/destination integrity
+media,upload,administrator;content_editor;designer,
+media,delete,administrator,Block referenced assets
+galleries,edit,administrator;content_editor;designer,
+galleries,publish,administrator,
+reviews,view_private,administrator;review_moderator,Sensitive content
+reviews,moderate,administrator;review_moderator,Pending hidden from public
+reviews,reply,administrator;review_moderator,
+builders,edit,administrator;designer,Draft only
+builders,publish,administrator,Global changes audited
+menus,manage,administrator;designer,
+pages,edit,administrator;content_editor;designer,
+pages,publish,administrator,
+blog,edit,administrator;content_editor,
+blog,publish,administrator,
+bookings,view,administrator;booking_agent,Data minimization
+bookings,manage,administrator;booking_agent,Notes restricted
+seo,edit,administrator;seo_editor,
+seo,publish,administrator;seo_editor,Publication audited
+seo.ai,propose,administrator;seo_editor,AI costs controlled
+seo.ai,review,administrator;seo_editor,No auto publishing
+settings,manage,super_admin,Higher-risk settings
+roles,manage,super_admin,Escalation protected
+audit,view,super_admin,Sensitive event redaction
