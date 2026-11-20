@@ -1,0 +1,35 @@
+import type { PropsWithChildren } from 'react';
+import { Link } from '@inertiajs/react';
+
+/**
+ * Standalone public website shell. Never import AppLayout or AppSidebar here.
+ * Page-specific layout overrides the starter dashboard default when the Inertia
+ * resolver uses `page.default.layout ??= ...`.
+ */
+export default function PublicSiteLayout({ children }: PropsWithChildren) {
+    return (
+        <div data-bablys-public-site="true" className="flex min-h-screen w-full min-w-0 flex-col overflow-x-clip bg-[#f7f9fb] text-slate-900">
+            <a href="#main-content" className="sr-only rounded bg-white p-3 text-emerald-900 focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50">Skip to content</a>
+            <header className="relative z-10 w-full border-b border-slate-200 bg-white shadow-[0_3px_20px_rgba(16,36,45,0.03)]">
+                <div className="mx-auto flex w-full max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
+                    <Link href="/" className="inline-flex items-center gap-3 rounded-lg text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2" aria-label="Bably's Club homepage">
+                        <span aria-hidden="true" className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-700 text-lg font-bold text-white">B</span>
+                        <span className="flex flex-col leading-tight"><strong className="text-lg tracking-tight">Bably's Club</strong><span className="text-xs font-medium text-slate-500">Tours &amp; Travels</span></span>
+                    </Link>
+                    <nav aria-label="Main website navigation" className="flex flex-wrap items-center gap-2 sm:gap-4">
+                        <Link href="/" className="rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Home</Link>
+                        <Link href="/tours" className="rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Explore Tours</Link>
+                        <Link href="/tours" className="hidden rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 sm:inline-flex">Find a Tour</Link>
+                    </nav>
+                </div>
+            </header>
+            <div id="main-content" className="w-full min-w-0 flex-1">{children}</div>
+            <footer className="mt-auto w-full border-t border-slate-200 bg-white">
+                <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-7 text-sm text-slate-600 sm:px-6 lg:px-8">
+                    <p><strong className="text-slate-800">Bably's Club</strong> · Tours &amp; Travels</p>
+                    <p>Tour requests are enquiries. Availability and prices require confirmation.</p>
+                </div>
+            </footer>
+        </div>
+    );
+}

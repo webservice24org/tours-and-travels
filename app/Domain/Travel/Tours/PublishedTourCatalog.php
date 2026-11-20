@@ -5,17 +5,26 @@ declare(strict_types=1);
 namespace App\Domain\Travel\Tours;
 
 use App\Domain\Cms\Enums\PublicationStatus;
+use App\Models\Travel\Destination;
 use App\Models\Travel\Tour;
+use App\Models\Travel\TourCategory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * Future builder data source. No route or visual block is registered in P3C.
- * This service excludes draft, archived, scheduled and future publications.
- * It deliberately exposes no price or inventory until P3E.
+ * Public read-side contract. All queries use the Tour publiclyAvailable scope.
+ * This class does not expose prices, capacity, bookings or nonpublic media.
+ * P3F.2B.2 adds public cover photos and published destination labels to browse() only.
  */
 final class PublishedTourCatalog
 {
+    private const PUBLIC_COLUMNS = ['id', 'title', 'slug', 'summary', 'duration_days', 'is_featured'];
+    private const PAGE_SIZE = 12;
+    private const TAXONOMY_SUGGESTIONS = 200;
+
     /**
+     * Backward-compatible catalog contract for builder consumers.
+     *
      * @return list<array{id:int,title:string,slug:string,summary:?string,duration_days:int,is_featured:bool}>
      */
     public function tours(
@@ -24,6 +33,130 @@ final class PublishedTourCatalog
         int $limit = 12,
         bool $featuredOnly = false,
     ): array {
+        $query = $this->publicQuery($categorySlug, $destinationSlug);
+        if ($featuredOnly) {
+            $query->where('is_featured', true);
+        }
+
+        $rows = $query->ordered()->limit(max(1, min(50, $limit)))
+            ->get(self::PUBLIC_COLUMNS);
+
+        $result = [];
+        foreach ($rows as $tour) {
+            $result[] = $this->publicRow($tour);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Full published-inventory SQL pagination; no in-memory window or PHP sorting.
+     * Search wildcards are escaped and bound; ordering is a fixed allowlist.
+     *
+     * @return array{tours:list<array{id:int,title:string,slug:string,summary:?string,duration_days:int,is_featured:bool,cover_image:?array{src:string,alt:string,width:int,height:int},destination_name:?string}>,pagination:array{page:int,per_page:int,last_page:int,total:int,has_previous:bool,has_next:bool}}
+     */
+    public function browse(
+        ?string $categorySlug,
+        ?string $destinationSlug,
+        string $search,
+        string $sort,
+        int $page,
+    ): array {
+        $query = $this->publicQuery($categorySlug, $destinationSlug);
+        // One eager-loaded relation query per page. Never show a draft or
+        // archived destination label, even for a published tour.
+        $query->with(['destinations' => static function (BelongsToMany $destinations): void {
+            $destinations->where('travel_destinations.status', PublicationStatus::Published->value)
+                ->orderBy('travel_destinations.name')->orderBy('travel_destinations.id');
+        }]);
+
+        if ($search !== '') {
+            // ! is an explicit LIKE escape accepted by MySQL and SQLite.
+            // A search for '%' or '_' must match a literal character, not every tour.
+            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search).'%';
+            $query->where(static function (Builder $matching) use ($pattern): void {
+                $matching->whereRaw("title LIKE ? ESCAPE '!'", [$pattern])
+                    ->orWhereRaw("summary LIKE ? ESCAPE '!'", [$pattern]);
+            });
+        }
+
+        switch ($sort) {
+            case 'title_asc':
+                $query->orderBy('title');
+                break;
+            case 'duration_asc':
+                $query->orderBy('duration_days');
+                break;
+            case 'duration_desc':
+                $query->orderByDesc('duration_days');
+                break;
+            default:
+                $query->orderByDesc('is_featured');
+                break;
+        }
+        // Stable page boundaries, including identical titles/durations.
+        $query->orderBy('slug')->orderBy('id');
+
+        $paginated = $query->paginate(self::PAGE_SIZE, self::PUBLIC_COLUMNS, 'page', $page);
+        $titles = [];
+        foreach ($paginated->items() as $tour) {
+            /** @var Tour $tour */
+            $titles[(int) $tour->id] = (string) $tour->title;
+        }
+        $covers = app(PublicTourCardMedia::class)->coversFor($titles);
+
+        $result = [];
+        foreach ($paginated->items() as $tour) {
+            /** @var Tour $tour */
+            $row = $this->publicRow($tour);
+            /** @var Destination|null $destination */
+            $destination = $tour->destinations->first();
+            $row['destination_name'] = $destination !== null ? (string) $destination->name : null;
+            $row['cover_image'] = $covers[(int) $tour->id] ?? null;
+            $result[] = $row;
+        }
+
+        return [
+            'tours' => $result,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => self::PAGE_SIZE,
+                'last_page' => $paginated->lastPage(),
+                'total' => $paginated->total(),
+                'has_previous' => $page > 1,
+                'has_next' => $paginated->hasMorePages(),
+            ],
+        ];
+    }
+
+    /**
+     * Published-only taxonomy suggestions. Text entry remains available because
+     * suggestions are capped for response-size safety; the filters are not capped.
+     *
+     * @return array{categories:list<array{slug:string,name:string}>,destinations:list<array{slug:string,name:string}>}
+     */
+    public function filterOptions(): array
+    {
+        $categories = [];
+        foreach (TourCategory::query()->where('status', PublicationStatus::Published->value)
+            ->orderBy('name')->orderBy('id')->limit(self::TAXONOMY_SUGGESTIONS)
+            ->get(['slug', 'name']) as $category) {
+            $categories[] = ['slug' => (string) $category->slug, 'name' => (string) $category->name];
+        }
+
+        $destinations = [];
+        foreach (Destination::query()->where('status', PublicationStatus::Published->value)
+            ->orderBy('name')->orderBy('id')->limit(self::TAXONOMY_SUGGESTIONS)
+            ->get(['slug', 'name']) as $destination) {
+            $destinations[] = ['slug' => (string) $destination->slug, 'name' => (string) $destination->name];
+        }
+
+        return ['categories' => $categories, 'destinations' => $destinations];
+    }
+
+    /** @return Builder<Tour> */
+    private function publicQuery(?string $categorySlug, ?string $destinationSlug): Builder
+    {
         $query = Tour::query()->publiclyAvailable();
 
         if ($categorySlug !== null) {
@@ -40,20 +173,19 @@ final class PublishedTourCatalog
             });
         }
 
-        if ($featuredOnly) {
-            $query->where('is_featured', true);
-        }
+        return $query;
+    }
 
-        $rows = $query->ordered()->limit(max(1, min(50, $limit)))
-            ->get(['id', 'title', 'slug', 'summary', 'duration_days', 'is_featured']);
-
-        return array_values($rows->map(static fn (Tour $tour): array => [
+    /** @return array{id:int,title:string,slug:string,summary:?string,duration_days:int,is_featured:bool} */
+    private function publicRow(Tour $tour): array
+    {
+        return [
             'id' => (int) $tour->id,
-            'title' => $tour->title,
-            'slug' => $tour->slug,
+            'title' => (string) $tour->title,
+            'slug' => (string) $tour->slug,
             'summary' => $tour->summary,
-            'duration_days' => $tour->duration_days,
-            'is_featured' => $tour->is_featured,
-        ])->all());
+            'duration_days' => (int) $tour->duration_days,
+            'is_featured' => (bool) $tour->is_featured,
+        ];
     }
 }

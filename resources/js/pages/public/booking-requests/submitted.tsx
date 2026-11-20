@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import PublicSiteLayout from '../../../layouts/public-site-layout';
+
 import { Head, Link } from '@inertiajs/react';
 
 export default function BookingRequestSubmitted({ reference, guest }: { reference: string; guest: boolean }) {
@@ -16,3 +19,6 @@ export default function BookingRequestSubmitted({ reference, guest }: { referenc
         </section>
     </main>;
 }
+
+// Public enquiry/customer request pages never inherit the CMS/dashboard sidebar.
+BookingRequestSubmitted.layout = (page: ReactNode) => <PublicSiteLayout>{page}</PublicSiteLayout>;

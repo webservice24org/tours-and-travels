@@ -1,0 +1,83 @@
+import { Head } from '@inertiajs/react';
+
+type TourCard = {
+    id: number;
+    title: string;
+    slug: string;
+    summary: string | null;
+    duration_days: number;
+    is_featured: boolean;
+};
+
+type Props = {
+    tours: TourCard[];
+    filters: { category: string; destination: string };
+    result_limit: number;
+};
+
+const fieldClass =
+    'mt-1 block w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 focus:border-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-200';
+
+/** P3F.1: public, read-only discovery starter. No prices, seat promises, or booking actions. */
+export default function PublicTourIndex({ tours, filters, result_limit }: Props) {
+    return (
+        <main className="min-h-screen min-w-0 bg-slate-50 text-slate-900">
+            <Head title="Published Tours | Bablys Tours & Travels">
+                <meta
+                    name="description"
+                    content="Explore published tour experiences from Bablys Tours & Travels."
+                />
+            </Head>
+            <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+                <div className="max-w-3xl">
+                    <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Discover journeys</p>
+                    <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Our tours</h1>
+                    <p className="mt-3 text-base leading-7 text-slate-600">
+                        Browse published tour information. Details and departures are subject to confirmation.
+                    </p>
+                </div>
+
+                <form method="get" action="/tours" role="search" className="mt-8 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <label className="min-w-0 text-sm font-semibold text-slate-700">
+                        Category slug
+                        <input name="category" type="text" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={120}
+                            defaultValue={filters.category} placeholder="e.g. adventure" className={fieldClass} />
+                    </label>
+                    <label className="min-w-0 text-sm font-semibold text-slate-700">
+                        Destination slug
+                        <input name="destination" type="text" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={120}
+                            defaultValue={filters.destination} placeholder="e.g. coxs-bazar" className={fieldClass} />
+                    </label>
+                    <button type="submit" className="rounded-lg bg-teal-800 px-5 py-3 font-semibold text-white hover:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2">
+                        Filter tours
+                    </button>
+                </form>
+
+                <div className="mt-8 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600" aria-live="polite">
+                    <span>{tours.length} published {tours.length === 1 ? 'tour' : 'tours'} shown (up to {result_limit})</span>
+                    {(filters.category || filters.destination) && <a href="/tours" className="font-semibold text-teal-800 underline underline-offset-2 hover:text-teal-900">Clear filters</a>}
+                </div>
+
+                {tours.length === 0 ? (
+                    <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                        <h2 className="text-lg font-semibold">No published tours found</h2>
+                        <p className="mt-2 text-slate-600">Try another category or destination.</p>
+                    </div>
+                ) : (
+                    <ul className="mt-6 grid min-w-0 list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-3">
+                        {tours.map((tour) => (
+                            <li key={tour.id} className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                {tour.is_featured && <span className="inline-block rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-900">Featured</span>}
+                                <h2 className="mt-3 break-words text-xl font-semibold leading-snug">{tour.title}</h2>
+                                <p className="mt-2 text-sm font-medium text-slate-600">
+                                    {tour.duration_days} {tour.duration_days === 1 ? 'day' : 'days'}
+                                </p>
+                                {tour.summary && <p className="mt-3 break-words text-sm leading-6 text-slate-700">{tour.summary}</p>}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+        </main>
+    );
+}

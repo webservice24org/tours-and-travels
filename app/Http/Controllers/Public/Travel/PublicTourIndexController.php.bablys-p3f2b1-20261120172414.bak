@@ -1,0 +1,147 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Public\Travel;
+
+use App\Domain\Travel\Tours\PublishedTourCatalog;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+/**
+ * P3F.2A: bounded, read-only search/sorting/pagination over the existing
+ * published catalog. No independent publication query or pricing authority.
+ *
+ * The catalog may impose a stricter internal limit than WINDOW_LIMIT. P3F.2B
+ * will introduce SQL-backed pagination after the actual catalog query contract
+ * is reviewed; this increment does not claim complete traversal of all tours.
+ */
+final class PublicTourIndexController
+{
+    private const WINDOW_LIMIT = 240;
+    private const PAGE_SIZE = 12;
+
+    public function __invoke(Request $request, PublishedTourCatalog $catalog): Response
+    {
+        $category = $this->slugFilter($request->query('category'));
+        $destination = $this->slugFilter($request->query('destination'));
+        $search = $this->searchFilter($request->query('q'));
+        $sort = $this->sortFilter($request->query('sort'));
+        $page = $this->pageFilter($request->query('page'));
+
+        // The existing PublishedTourCatalog owns publication/association rules,
+        // field whitelisting, and deterministic base ordering.
+        $rows = $catalog->tours($category, $destination, self::WINDOW_LIMIT);
+        $needle = strtolower($search);
+        $filtered = array_values(array_filter($rows, static function (array $row) use ($needle): bool {
+            if ($needle === '') {
+                return true;
+            }
+            $haystack = (string) ($row['title'] ?? '').' '.(string) ($row['summary'] ?? '');
+
+            return stripos($haystack, $needle) !== false;
+        }));
+
+        usort($filtered, static function (array $left, array $right) use ($sort): int {
+            $leftTitle = (string) ($left['title'] ?? '');
+            $rightTitle = (string) ($right['title'] ?? '');
+            $comparison = match ($sort) {
+                'title_asc' => strcasecmp($leftTitle, $rightTitle),
+                'duration_asc' => ((int) ($left['duration_days'] ?? 0)) <=> ((int) ($right['duration_days'] ?? 0)),
+                'duration_desc' => ((int) ($right['duration_days'] ?? 0)) <=> ((int) ($left['duration_days'] ?? 0)),
+                default => ((int) (bool) ($right['is_featured'] ?? false)) <=> ((int) (bool) ($left['is_featured'] ?? false)),
+            };
+
+            return $comparison !== 0
+                ? $comparison
+                : (strcmp((string) ($left['slug'] ?? ''), (string) ($right['slug'] ?? ''))
+                    ?: ((int) ($left['id'] ?? 0) <=> (int) ($right['id'] ?? 0)));
+        });
+
+        $total = count($filtered);
+        $lastPage = max(1, (int) ceil($total / self::PAGE_SIZE));
+        if ($page > $lastPage) {
+            throw new NotFoundHttpException('Tour listing page not found.');
+        }
+
+        return Inertia::render('public/tours/index', [
+            'tours' => array_slice($filtered, ($page - 1) * self::PAGE_SIZE, self::PAGE_SIZE),
+            'filters' => [
+                'category' => $category ?? '',
+                'destination' => $destination ?? '',
+                'q' => $search,
+                'sort' => $sort,
+            ],
+            'pagination' => [
+                'page' => $page,
+                'per_page' => self::PAGE_SIZE,
+                'last_page' => $lastPage,
+                'total_in_window' => $total,
+                'has_previous' => $page > 1,
+                'has_next' => $page < $lastPage,
+                'catalog_window_requested' => self::WINDOW_LIMIT,
+                'bounded' => true,
+            ],
+            // Retained for P3F.1 backward-compatible Inertia assertions.
+            'result_limit' => 24,
+        ]);
+    }
+
+    private function slugFilter(mixed $input): ?string
+    {
+        if ($input === null || $input === '') {
+            return null;
+        }
+        if (! is_string($input) || strlen($input) > 120 ||
+            preg_match('/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/D', $input) !== 1) {
+            throw new NotFoundHttpException('Unknown tour filter.');
+        }
+
+        return $input;
+    }
+
+    private function searchFilter(mixed $input): string
+    {
+        if ($input === null || $input === '') {
+            return '';
+        }
+        if (! is_string($input) || strlen($input) > 160 ||
+            preg_match('/[\x00-\x1f\x7f]/', $input) === 1) {
+            throw new NotFoundHttpException('Unknown tour search.');
+        }
+        $value = trim($input);
+        if (mb_strlen($value) > 80) {
+            throw new NotFoundHttpException('Tour search is too long.');
+        }
+
+        return $value;
+    }
+
+    private function sortFilter(mixed $input): string
+    {
+        if ($input === null || $input === '') {
+            return 'featured';
+        }
+        if (! is_string($input) || ! in_array($input, [
+            'featured', 'title_asc', 'duration_asc', 'duration_desc',
+        ], true)) {
+            throw new NotFoundHttpException('Unknown tour sort.');
+        }
+
+        return $input;
+    }
+
+    private function pageFilter(mixed $input): int
+    {
+        if ($input === null || $input === '') {
+            return 1;
+        }
+        if (! is_string($input) || preg_match('/\A[1-9][0-9]{0,4}\z/D', $input) !== 1) {
+            throw new NotFoundHttpException('Unknown tour page.');
+        }
+
+        return (int) $input;
+    }
+}

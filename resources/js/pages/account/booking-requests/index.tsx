@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import PublicSiteLayout from '../../../layouts/public-site-layout';
+
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -31,3 +34,6 @@ export default function CustomerBookingRequests({ requests }: { requests: Bookin
         </div>
     </main>;
 }
+
+// Public enquiry/customer request pages never inherit the CMS/dashboard sidebar.
+CustomerBookingRequests.layout = (page: ReactNode) => <PublicSiteLayout>{page}</PublicSiteLayout>;

@@ -1,0 +1,230 @@
+import { Head } from '@inertiajs/react';
+import type { ReactNode } from 'react';
+import PublicSiteLayout from '../../../layouts/public-site-layout';
+
+type TourCard = {
+    id: number;
+    title: string;
+    slug: string;
+    summary: string | null;
+    duration_days: number;
+    is_featured: boolean;
+    destination_name: string | null;
+    cover_image: { src: string; alt: string; width: number; height: number } | null;
+};
+
+type Filters = {
+    category: string;
+    destination: string;
+    q: string;
+    sort: 'featured' | 'title_asc' | 'duration_asc' | 'duration_desc';
+};
+
+type FilterOption = { slug: string; name: string };
+
+type Pagination = {
+    page: number;
+    per_page: number;
+    last_page: number;
+    total: number;
+    has_previous: boolean;
+    has_next: boolean;
+};
+
+type Seo = {
+    title: string;
+    description: string;
+    canonical_url: string;
+    robots: string;
+};
+
+type Props = {
+    seo: Seo;
+    tours: TourCard[];
+    filters: Filters;
+    filter_options: { categories: FilterOption[]; destinations: FilterOption[] };
+    pagination: Pagination;
+    result_limit: number;
+};
+
+const inputClass =
+    'mt-1 block min-h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 focus:border-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2';
+
+function pageHref(filters: Filters, page: number): string {
+    const params = new URLSearchParams();
+    if (filters.category) params.set('category', filters.category);
+    if (filters.destination) params.set('destination', filters.destination);
+    if (filters.q) params.set('q', filters.q);
+    if (filters.sort !== 'featured') params.set('sort', filters.sort);
+    if (page > 1) params.set('page', String(page));
+    const query = params.toString();
+
+    return query ? `/tours?${query}` : '/tours';
+}
+
+/** P3F.2B.2 image-led cards. The CTA opens an existing nonbinding booking-request form. */
+export default function PublicTourIndex({ seo, tours, filters, filter_options, pagination }: Props) {
+    const start = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.per_page + 1;
+    const end = pagination.total === 0 ? 0 : start + tours.length - 1;
+    const hasFilters = Boolean(filters.q || filters.category || filters.destination || filters.sort !== 'featured');
+
+    return (
+        <main className="min-h-screen min-w-0 overflow-x-clip bg-[#f7f9fb] text-slate-900">
+            <Head title={seo.title}>
+                <meta name="description" content={seo.description} />
+                <meta name="robots" content={seo.robots} />
+                <link rel="canonical" href={seo.canonical_url} />
+                <meta property="og:type" content="website" />
+                <meta property="og:site_name" content="Bably's Club" />
+                <meta property="og:title" content={seo.title} />
+                <meta property="og:description" content={seo.description} />
+                <meta property="og:url" content={seo.canonical_url} />
+                <meta name="twitter:card" content="summary" />
+                <meta name="twitter:title" content={seo.title} />
+                <meta name="twitter:description" content={seo.description} />
+            </Head>
+            <section className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+                <div className="max-w-3xl">
+                    <p className="text-sm font-semibold uppercase tracking-wide text-teal-800">Discover journeys</p>
+                    <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">Explore tour packages</h1>
+                    <p className="mt-3 text-base leading-7 text-slate-600">
+                        Browse published experiences. Prices, departures and availability are subject to confirmation.
+                    </p>
+                </div>
+
+                <form method="get" action="/tours" role="search" aria-label="Search published tours"
+                    className="mt-8 grid min-w-0 gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <label className="min-w-0 text-sm font-semibold text-slate-700">
+                        Search tours
+                        <input id="tour-query" name="q" type="search" maxLength={80} defaultValue={filters.q}
+                            placeholder="Name or summary" className={inputClass} />
+                    </label>
+                    <label className="min-w-0 text-sm font-semibold text-slate-700">
+                        Category
+                        <input id="tour-category" aria-describedby="tour-category-help" name="category" type="text" list="published-tour-categories"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={120}
+                            defaultValue={filters.category} placeholder="Choose a category" className={inputClass} />
+                        <span id="tour-category-help" className="mt-1 block text-xs font-normal leading-5 text-slate-600">Choose a published category or enter its slug.</span>
+                        <datalist id="published-tour-categories">
+                            {filter_options.categories.map((option) => (
+                                <option key={option.slug} value={option.slug} label={option.name} />
+                            ))}
+                        </datalist>
+                    </label>
+                    <label className="min-w-0 text-sm font-semibold text-slate-700">
+                        Destination
+                        <input id="tour-destination" aria-describedby="tour-destination-help" name="destination" type="text" list="published-tour-destinations"
+                            pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={120}
+                            defaultValue={filters.destination} placeholder="Choose a destination" className={inputClass} />
+                        <span id="tour-destination-help" className="mt-1 block text-xs font-normal leading-5 text-slate-600">Choose a published destination or enter its slug.</span>
+                        <datalist id="published-tour-destinations">
+                            {filter_options.destinations.map((option) => (
+                                <option key={option.slug} value={option.slug} label={option.name} />
+                            ))}
+                        </datalist>
+                    </label>
+                    <label className="min-w-0 text-sm font-semibold text-slate-700">
+                        Sort by
+                        <select name="sort" defaultValue={filters.sort} className={inputClass}>
+                            <option value="featured">Featured first</option>
+                            <option value="title_asc">Title A–Z</option>
+                            <option value="duration_asc">Shortest duration</option>
+                            <option value="duration_desc">Longest duration</option>
+                        </select>
+                    </label>
+                    <div className="flex min-w-0 flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
+                        <button type="submit" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-800 px-5 py-2.5 font-semibold text-white hover:bg-teal-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2">
+                            Apply filters
+                        </button>
+                        {hasFilters && <a href="/tours" className="inline-flex min-h-11 items-center font-semibold text-teal-800 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600">Clear filters</a>}
+                    </div>
+                </form>
+
+                <div className="mt-8 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600" role="status" aria-live="polite">
+                    <span>Showing {start}–{end} of {pagination.total} matching published tours</span>
+                    <span>Page {pagination.page} of {pagination.last_page}</span>
+                </div>
+
+                {tours.length === 0 ? (
+                    <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+                        <h2 className="text-lg font-semibold">No matching published tours</h2>
+                        <p className="mt-2 text-slate-600">Try another search, category or destination.</p>
+                    </div>
+                ) : (
+                    <ul aria-label="Matching published tour packages" className="mt-7 grid min-w-0 list-none gap-6 p-0 sm:grid-cols-2 xl:grid-cols-3">
+                        {tours.map((tour) => (
+                            <li key={tour.id} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_12px_40px_rgba(29,41,57,0.06)] ring-1 ring-slate-100 transition-shadow hover:shadow-[0_16px_42px_rgba(29,41,57,0.12)]">
+                                <div className="relative aspect-[3/2] w-full overflow-hidden bg-gradient-to-br from-emerald-100 via-teal-100 to-sky-200">
+                                    {tour.cover_image ? (
+                                        <img src={tour.cover_image.src} alt={tour.cover_image.alt}
+                                            width={tour.cover_image.width} height={tour.cover_image.height}
+                                            loading="lazy" decoding="async" referrerPolicy="no-referrer"
+                                            className="h-full w-full object-cover transition-transform duration-500 motion-reduce:transform-none motion-reduce:transition-none group-hover:scale-[1.035]" />
+                                    ) : (
+                                        <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-teal-900/75" role="img" aria-label={`Photograph not available for ${tour.title}`}>
+                                            <svg aria-hidden="true" viewBox="0 0 88 70" fill="none" className="h-16 w-20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="67" cy="16" r="7" />
+                                                <path d="M4 61 27 27l18 25 11-16 28 25M4 61h80" />
+                                            </svg>
+                                            <span className="text-sm font-medium">Tour photo coming soon</span>
+                                        </div>
+                                    )}
+                                    <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm">
+                                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                                        </svg>
+                                        {tour.duration_days} {tour.duration_days === 1 ? 'Day' : 'Days'}
+                                    </span>
+                                    {tour.is_featured && (
+                                        <span className="absolute right-4 top-4 rounded-md bg-white/95 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm">Featured</span>
+                                    )}
+                                </div>
+                                <div className="flex flex-1 flex-col p-5 sm:p-6">
+                                    <h2 className="break-words text-xl font-bold leading-snug text-slate-800 sm:text-2xl"><a href={`/tours/${encodeURIComponent(tour.slug)}`} className="rounded-sm hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" aria-label={`View details for ${tour.title}`}>{tour.title}</a></h2>
+                                    <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-600 sm:text-base">
+                                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 shrink-0 text-emerald-700" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" />
+                                        </svg>
+                                        {tour.destination_name ?? 'Destination details on enquiry'}
+                                    </p>
+                                    {tour.summary && <p className="mt-3 line-clamp-2 break-words text-sm leading-6 text-slate-600">{tour.summary}</p>}
+                                    <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-6">
+                                        <a href={`/tours/${encodeURIComponent(tour.slug)}/booking-request`}
+                                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-emerald-600 px-4 py-2 text-sm font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+                                            aria-label={`Enquire about ${tour.title}`}>
+                                            Enquire Now
+                                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-4 w-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
+                                        </a>
+                                        <span className="text-right text-xs text-slate-600">Tour pricing<strong className="block text-base font-bold text-emerald-700">On enquiry</strong></span>
+                                    </div>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                {pagination.last_page > 1 && (
+                    <nav aria-label="Tour results pagination" className="mt-8 flex flex-wrap items-center justify-between gap-3">
+                        {pagination.has_previous ? (
+                            <a href={pageHref(filters, pagination.page - 1)} rel="prev"
+                                className="rounded-lg border border-teal-800 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600">Previous</a>
+                        ) : <span aria-hidden="true" />}
+                        <span aria-current="page" className="text-sm text-slate-600">Page {pagination.page} of {pagination.last_page}</span>
+                        {pagination.has_next ? (
+                            <a href={pageHref(filters, pagination.page + 1)} rel="next"
+                                className="rounded-lg border border-teal-800 px-4 py-2 font-semibold text-teal-800 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-600">Next</a>
+                        ) : <span aria-hidden="true" />}
+                    </nav>
+                )}
+
+                <p className="mt-6 text-xs leading-5 text-slate-500">
+                    Results are paginated across the full published catalog, not a 50-tour window.
+                    Submitting a booking request does not reserve seats or confirm availability.
+                </p>
+            </section>
+        </main>
+    );
+}
+
+// Public pages must not inherit the Laravel dashboard/sidebar layout.
+PublicTourIndex.layout = (page: ReactNode) => <PublicSiteLayout>{page}</PublicSiteLayout>;

@@ -1,0 +1,133 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Public\Travel;
+
+use App\Domain\Travel\Tours\PublishedTourCatalog;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+/** P3F.2B.1: real SQL pagination, published taxonomy suggestions, read-only props. */
+final class PublicTourIndexController
+{
+    public function __invoke(Request $request, PublishedTourCatalog $catalog): Response
+    {
+        $category = $this->slugFilter($request->query('category'));
+        $destination = $this->slugFilter($request->query('destination'));
+        $search = $this->searchFilter($request->query('q'));
+        $sort = $this->sortFilter($request->query('sort'));
+        $page = $this->pageFilter($request->query('page'));
+
+        $browse = $catalog->browse($category, $destination, $search, $sort, $page);
+        if ($page > $browse['pagination']['last_page']) {
+            throw new NotFoundHttpException('Tour listing page not found.');
+        }
+
+        // Only the unfiltered listing and its own numbered pages are indexable.
+        // Never allow search text, taxonomy slugs, sort values or tracking data
+        // to contaminate the canonical URL or public SEO metadata.
+        $isFiltered = $category !== null || $destination !== null
+            || $search !== '' || $sort !== 'featured';
+        $listingUrl = route('public.tours.index');
+        $canonicalUrl = ! $isFiltered && $page > 1
+            ? $listingUrl.'?page='.$page : $listingUrl;
+        $pageTitle = ! $isFiltered && $page > 1
+            ? 'Explore Tours — Page '.$page.' | Bablys Tours & Travels'
+            : 'Explore Tours | Bablys Tours & Travels';
+
+        $response = Inertia::render('public/tours/index', [
+            'tours' => $browse['tours'],
+            'seo' => [
+                'title' => $pageTitle,
+                'description' => 'Explore published tours with Bablys Tours & Travels. Dates, prices and availability are subject to confirmation.',
+                'canonical_url' => $canonicalUrl,
+                'robots' => $isFiltered ? 'noindex, follow' : 'index, follow',
+            ],
+            'filters' => [
+                'category' => $category ?? '',
+                'destination' => $destination ?? '',
+                'q' => $search,
+                'sort' => $sort,
+            ],
+            'filter_options' => $catalog->filterOptions(),
+            'pagination' => array_merge($browse['pagination'], [
+                // P3F.2A compatibility; this count is now truly global.
+                'total_in_window' => $browse['pagination']['total'],
+                'catalog_window_requested' => null,
+                'bounded' => false,
+            ]),
+            // P3F.1 backward-compatible Inertia contract.
+            'result_limit' => 24,
+        ])->toResponse($request);
+
+        // SSR and client-side Head handling vary by deployment. Send the robots
+        // policy at HTTP level too, so crawlers never have to run JavaScript
+        // to learn that filtered, searched or alternatively sorted URLs
+        // are not intended for indexing. Canonical base/page URLs retain
+        // their existing indexable policy.
+        if ($isFiltered) {
+            $response->headers->set('X-Robots-Tag', 'noindex, follow');
+        }
+
+        return $response;
+    }
+
+    private function slugFilter(mixed $input): ?string
+    {
+        if ($input === null || $input === '') {
+            return null;
+        }
+        if (! is_string($input) || strlen($input) > 120 ||
+            preg_match('/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/D', $input) !== 1) {
+            throw new NotFoundHttpException('Unknown tour filter.');
+        }
+
+        return $input;
+    }
+
+    private function searchFilter(mixed $input): string
+    {
+        if ($input === null || $input === '') {
+            return '';
+        }
+        if (! is_string($input) || strlen($input) > 160 ||
+            preg_match('/[\x00-\x1f\x7f]/', $input) === 1) {
+            throw new NotFoundHttpException('Unknown tour search.');
+        }
+        $value = trim($input);
+        if (mb_strlen($value) > 80) {
+            throw new NotFoundHttpException('Tour search is too long.');
+        }
+
+        return $value;
+    }
+
+    private function sortFilter(mixed $input): string
+    {
+        if ($input === null || $input === '') {
+            return 'featured';
+        }
+        if (! is_string($input) || ! in_array($input, [
+            'featured', 'title_asc', 'duration_asc', 'duration_desc',
+        ], true)) {
+            throw new NotFoundHttpException('Unknown tour sort.');
+        }
+
+        return $input;
+    }
+
+    private function pageFilter(mixed $input): int
+    {
+        if ($input === null || $input === '') {
+            return 1;
+        }
+        if (! is_string($input) || preg_match('/\A[1-9][0-9]{0,4}\z/D', $input) !== 1) {
+            throw new NotFoundHttpException('Unknown tour page.');
+        }
+
+        return (int) $input;
+    }
+}

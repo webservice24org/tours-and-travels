@@ -15,6 +15,7 @@ use App\Models\Travel\TourBookingRequest;
 use App\Models\Travel\TourDeparture;
 use App\Models\Travel\TourPriceVariant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -46,10 +47,37 @@ final class PublicBookingRequestController extends Controller
         $this->assertPublicTour($tour);
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
+        $nowUtc = now('UTC')->format('Y-m-d H:i:s');
         $departures = TourDeparture::query()->where('tour_id', $tour->getKey())
-            ->where('status', 'open')->where('starts_at', '>', now('UTC')->format('Y-m-d H:i:s'))
+            ->where('status', 'open')->where('starts_at', '>', $nowUtc)
+            ->where(static function (Builder $query) use ($nowUtc): void {
+                $query->whereNull('booking_closes_at')
+                    ->orWhere('booking_closes_at', '>', $nowUtc);
+            })
             ->whereColumn('capacity_total', '>', 'seats_committed')
-            ->orderBy('starts_at')->limit(100)->get(['id', 'name', 'starts_at', 'timezone_name']);
+            ->orderBy('starts_at')->orderBy('id')->limit(100)
+            ->get(['id', 'name', 'starts_at', 'timezone_name']);
+
+        // Tour detail links carry only a public UTC date hint, never inventory identifiers.
+        // Compare it solely against this tour's currently requestable departure options.
+        $requested = $request->query->has('departure_at');
+        $rawDepartureAt = $request->query->all()['departure_at'] ?? null;
+        $selectedDepartureId = null;
+        if ($requested && is_string($rawDepartureAt)
+            && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/D', $rawDepartureAt) === 1) {
+            $sqlUtc = str_replace('T', ' ', substr($rawDepartureAt, 0, -1));
+            $match = $departures->first(static fn (TourDeparture $row): bool => (string) $row->starts_at === $sqlUtc);
+            if ($match instanceof TourDeparture) {
+                $selectedDepartureId = (int) $match->getKey();
+            }
+        }
+        $departureSelection = [
+            'requested' => $requested,
+            'selected_id' => $selectedDepartureId,
+            'notice' => $requested && $selectedDepartureId === null
+                ? 'That departure is no longer requestable. Please select an available departure.'
+                : null,
+        ];
         $variants = TourPriceVariant::query()->where('tour_id', $tour->getKey())
             ->where('is_active', true)->orderBy('sort_order')->limit(50)
             ->get(['code', 'name', 'currency']);
@@ -69,6 +97,7 @@ final class PublicBookingRequestController extends Controller
                 'email_verified' => $customer->email_verified_at !== null,
             ],
             'nonbinding' => true,
+            'departure_selection' => $departureSelection,
             'submission_id' => (string) Str::uuid(),
         ]);
     }

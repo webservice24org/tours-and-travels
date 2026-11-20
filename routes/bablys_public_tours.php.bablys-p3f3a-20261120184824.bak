@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Http\Controllers\Public\Travel\PublicTourIndexController;
+use Illuminate\Support\Facades\Route;
+
+// Include ONCE from routes/web.php. This endpoint is public and read-only.
+// The later /tours/{slug} detail route is intentionally NOT declared by P3F.1.
+Route::get('/tours', PublicTourIndexController::class)
+    ->middleware('throttle:90,1')
+    ->name('public.tours.index');

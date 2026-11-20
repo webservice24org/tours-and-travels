@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Public\Travel;
+
+use App\Domain\Travel\Tours\PublishedTourCatalog;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+/**
+ * P3F.1 read-only entry point. Later P3F steps add paginated listing and detail routes.
+ * All public-field selection and publication rules are owned by PublishedTourCatalog.
+ */
+final class PublicTourIndexController
+{
+    public function __invoke(Request $request, PublishedTourCatalog $catalog): Response
+    {
+        $category = $this->slugFilter($request->query('category'));
+        $destination = $this->slugFilter($request->query('destination'));
+
+        return Inertia::render('public/tours/index', [
+            'tours' => $catalog->tours($category, $destination, 24),
+            'filters' => [
+                'category' => $category ?? '',
+                'destination' => $destination ?? '',
+            ],
+            'result_limit' => 24,
+        ]);
+    }
+
+    private function slugFilter(mixed $input): ?string
+    {
+        if ($input === null || $input === '') {
+            return null;
+        }
+        if (! is_string($input) || strlen($input) > 120 ||
+            preg_match('/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/D', $input) !== 1) {
+            throw new NotFoundHttpException('Unknown tour filter.');
+        }
+
+        return $input;
+    }
+}

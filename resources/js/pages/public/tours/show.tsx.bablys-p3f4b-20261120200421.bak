@@ -1,0 +1,304 @@
+import { Head } from '@inertiajs/react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import PublicSiteLayout from '../../../layouts/public-site-layout';
+
+type Tour = {
+    title: string;
+    slug: string;
+    summary: string | null;
+    duration_days: number;
+    is_featured: boolean;
+    cover_image: { src: string; alt: string; width: number; height: number } | null;
+    gallery: { src: string; alt: string; width: number; height: number }[];
+    itinerary: {
+        day_number: number;
+        title: string;
+        location: string | null;
+        description: string | null;
+        overnight: string | null;
+        meals: string[];
+        highlights: string[];
+    }[];
+    upcoming_departures: {
+        name: string;
+        starts_at_utc: string;
+        ends_at_utc: string | null;
+        timezone: string;
+    }[];
+    destinations: { name: string; slug: string }[];
+    categories: { name: string; slug: string }[];
+    canonical_url: string;
+    enquiry_url: string;
+};
+
+type Props = { tour: Tour };
+/** Format UTC SQL times in the departure's original IANA timezone, if valid. */
+function formatDepartureTime(utc: string, timezone: string): string {
+    const date = new Date(utc);
+    if (Number.isNaN(date.getTime())) return 'Date to be confirmed';
+    try {
+        return new Intl.DateTimeFormat('en-GB', {
+            dateStyle: 'medium', timeStyle: 'short', timeZone: timezone,
+        }).format(date);
+    } catch {
+        return `${new Intl.DateTimeFormat('en-GB', {
+            dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC',
+        }).format(date)} UTC`;
+    }
+}
+
+
+/** Public, read-only tour detail. It is not a checkout or inventory promise. */
+export default function PublicTourShow({ tour }: Props) {
+    const description = tour.summary?.trim() || `Explore ${tour.title} with Bably's Club. Request details from our travel team.`;
+    const photos = tour.gallery.length ? tour.gallery : (tour.cover_image ? [tour.cover_image] : []);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
+    const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+    // Inertia may retain this component when moving between tour slugs.
+    useEffect(() => {
+        setActiveIndex(0);
+        setBrokenImages({});
+        thumbnailRefs.current = [];
+    }, [tour.slug]);
+
+    // A failed hero image should advance to another usable public image,
+    // rather than hiding the entire gallery when a fallback still exists.
+    const requestedIndex = Math.max(0, Math.min(activeIndex, photos.length - 1));
+    const visibleIndex = photos[requestedIndex] && !brokenImages[photos[requestedIndex].src]
+        ? requestedIndex
+        : photos.findIndex((photo) => !brokenImages[photo.src]);
+    const visibleSelected = visibleIndex >= 0 ? photos[visibleIndex] : null;
+
+    const selectPhoto = (requested: number, focusThumbnail = false) => {
+        if (photos.length < 1) return;
+        const start = ((requested % photos.length) + photos.length) % photos.length;
+        for (let offset = 0; offset < photos.length; offset += 1) {
+            const index = (start + offset) % photos.length;
+            if (!brokenImages[photos[index].src]) {
+                setActiveIndex(index);
+                if (focusThumbnail) thumbnailRefs.current[index]?.focus();
+                return;
+            }
+        }
+    };
+
+    const onThumbnailKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+        let next: number | null = null;
+        if (event.key === 'ArrowRight') next = index + 1;
+        if (event.key === 'ArrowLeft') next = index - 1;
+        if (event.key === 'Home') next = 0;
+        if (event.key === 'End') next = photos.length - 1;
+        if (next !== null) {
+            event.preventDefault();
+            selectPhoto(next, true);
+        }
+    };
+
+    const socialImage = tour.cover_image?.src;
+    const absoluteSocialImage = socialImage && /^https?:\/\//i.test(socialImage) ? socialImage : null;
+
+    return (
+        <main className="w-full min-w-0 overflow-x-clip bg-[#f7f9fb] text-slate-900">
+            <Head title={`${tour.title} | Bably's Club`}>
+                <meta name="description" content={description.slice(0, 155)} />
+                <link rel="canonical" href={tour.canonical_url} />
+                <meta property="og:type" content="article" />
+                <meta property="og:title" content={tour.title} />
+                <meta property="og:description" content={description.slice(0, 155)} />
+                {absoluteSocialImage && <meta property="og:image" content={absoluteSocialImage} />}
+            </Head>
+            <div className="mx-auto w-full max-w-[1440px] px-4 py-7 sm:px-6 sm:py-10 lg:px-8">
+                <nav aria-label="Breadcrumb" className="mb-6 text-sm text-slate-600">
+                    <ol className="flex flex-wrap items-center gap-2">
+                        <li><a href="/" className="rounded hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Home</a></li>
+                        <li aria-hidden="true">/</li>
+                        <li><a href="/tours" className="rounded hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Tours</a></li>
+                        <li aria-hidden="true">/</li>
+                        <li className="min-w-0 truncate font-semibold text-slate-900" aria-current="page">{tour.title}</li>
+                    </ol>
+                </nav>
+
+                <nav aria-label="On this page" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-100 bg-white px-4 py-3 text-sm shadow-sm">
+                    <span className="mr-2 font-semibold text-slate-800">Explore this tour</span>
+                    <a href="#tour-overview" className="rounded-lg px-3 py-2 font-medium text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Overview</a>
+                    {photos.length > 1 && <a href="#tour-gallery" className="rounded-lg px-3 py-2 font-medium text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Photos</a>}
+                    {tour.itinerary.length > 0 && <a href="#tour-itinerary" className="rounded-lg px-3 py-2 font-medium text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Itinerary</a>}
+                    {tour.upcoming_departures.length > 0 && <a href="#tour-departures" className="rounded-lg px-3 py-2 font-medium text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Departures</a>}
+                    <a href="#tour-enquiry" className="rounded-lg px-3 py-2 font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Enquire</a>
+                </nav>
+
+                <div className="grid min-w-0 items-start gap-8 lg:grid-cols-[minmax(0,1.75fr)_minmax(280px,0.8fr)]">
+                    <article className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-[0_10px_44px_rgba(14,34,39,0.06)] ring-1 ring-slate-100">
+                        <div className="relative aspect-[16/9] w-full overflow-hidden bg-gradient-to-br from-emerald-100 via-teal-100 to-sky-200">
+                            {visibleSelected ? (
+                                <img src={visibleSelected.src} alt={visibleSelected.alt}
+                                    width={visibleSelected.width} height={visibleSelected.height}
+                                    decoding="async" fetchPriority="high" referrerPolicy="no-referrer"
+                                    onError={() => setBrokenImages((current) => ({ ...current, [visibleSelected.src]: true }))}
+                                    className="h-full w-full object-cover" />
+                            ) : (
+                                <div role="img" aria-label={`Photograph not yet available for ${tour.title}`}
+                                    className="flex h-full flex-col items-center justify-center gap-3 text-center text-emerald-900/70">
+                                    <svg aria-hidden="true" viewBox="0 0 88 70" fill="none" className="h-20 w-24" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="67" cy="16" r="7" /><path d="M4 61 27 27l18 25 11-16 28 25M4 61h80" />
+                                    </svg>
+                                    <span className="text-sm font-semibold">Tour photograph coming soon</span>
+                                </div>
+                            )}
+                            {photos.length > 1 && visibleSelected && (
+                                <div aria-label="Gallery photo navigation" className="absolute inset-x-4 bottom-4 flex items-center justify-between gap-4">
+                                    <button type="button" onClick={() => selectPhoto(visibleIndex - 1)}
+                                        aria-label="Previous tour photograph"
+                                        className="grid min-h-11 min-w-11 place-items-center rounded-full bg-white/95 text-xl font-bold text-emerald-900 shadow hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">‹</button>
+                                    <button type="button" onClick={() => selectPhoto(visibleIndex + 1)}
+                                        aria-label="Next tour photograph"
+                                        className="grid min-h-11 min-w-11 place-items-center rounded-full bg-white/95 text-xl font-bold text-emerald-900 shadow hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">›</button>
+                                </div>
+                            )}
+                            <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+                                <span className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white shadow">{tour.duration_days} {tour.duration_days === 1 ? 'Day' : 'Days'}</span>
+                                {tour.is_featured && <span className="rounded-lg bg-white/95 px-3 py-2 text-sm font-semibold text-emerald-800 shadow">Featured Tour</span>}
+                            </div>
+                        </div>
+                        {photos.length > 1 && (
+                            <section id="tour-gallery" aria-label="Tour photo gallery" className="scroll-mt-24 border-b border-slate-100 bg-white px-4 py-5 sm:px-8">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <h2 className="text-base font-bold text-slate-900">Tour gallery</h2>
+                                    <span className="text-xs font-medium text-slate-500" aria-live="polite">{visibleIndex < 0 ? 'Photographs unavailable' : `${visibleIndex + 1} of ${photos.length} photos`}</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                                    {photos.map((photo, index) => (
+                                        <button
+                                            key={`${photo.src}-${index}`}
+                                            type="button"
+                                            ref={(element) => { thumbnailRefs.current[index] = element; }}
+                                            onClick={() => selectPhoto(index)}
+                                            onKeyDown={(event) => onThumbnailKeyDown(event, index)}
+                                            disabled={Boolean(brokenImages[photo.src])}
+                                            aria-label={`Show tour photo ${index + 1}: ${photo.alt}`}
+                                            aria-pressed={index === visibleIndex}
+                                            className={`relative aspect-[4/3] min-w-0 overflow-hidden rounded-lg border-2 bg-emerald-50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${index === visibleIndex ? 'border-emerald-600' : 'border-transparent hover:border-emerald-300'}`}
+                                        >
+                                            {brokenImages[photo.src] ? (
+                                                <span className="flex h-full items-center justify-center px-1 text-center text-[10px] text-emerald-800">Photo unavailable</span>
+                                            ) : (
+                                                <img src={photo.src} alt="" loading="lazy" decoding="async"
+                                                    width={photo.width} height={photo.height} referrerPolicy="no-referrer"
+                                                    onError={() => setBrokenImages((current) => ({ ...current, [photo.src]: true }))}
+                                                    className="h-full w-full object-cover" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                        <div className="p-5 sm:p-8 lg:p-10">
+                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Discover your next journey</p>
+                            <h1 className="mt-3 break-words text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{tour.title}</h1>
+                            {tour.destinations.length > 0 && (
+                                <div className="mt-5 flex flex-wrap gap-2" aria-label="Destinations">
+                                    {tour.destinations.map((destination) => (
+                                        <a key={destination.slug} href={`/tours?destination=${encodeURIComponent(destination.slug)}`}
+                                            className="rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">{destination.name}</a>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="my-7 h-px bg-slate-100" />
+                            <h2 id="tour-overview" className="scroll-mt-24 text-xl font-bold">About this tour</h2>
+                            <p className="mt-3 whitespace-pre-line break-words text-base leading-8 text-slate-700">{tour.summary?.trim() || 'Contact our team to discuss the itinerary, travel arrangements and options for this journey.'}</p>
+                            <a href={tour.enquiry_url} className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 lg:hidden">
+                                Enquire Now <span aria-hidden="true" className="ml-2">→</span>
+                            </a>
+
+                            {tour.itinerary.length > 0 && (
+                                <section id="tour-itinerary" aria-labelledby="itinerary-heading" className="mt-10 scroll-mt-24 border-t border-slate-100 pt-8">
+                                    <div className="mb-6">
+                                        <p className="text-xs font-bold uppercase tracking-[0.17em] text-emerald-700">Your journey, day by day</p>
+                                        <h2 id="itinerary-heading" className="mt-2 text-2xl font-bold text-slate-900">Tour itinerary</h2>
+                                    </div>
+                                    <ol className="space-y-4">
+                                        {tour.itinerary.map((day) => (
+                                            <li key={day.day_number} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+                                                <div className="flex items-start gap-4">
+                                                    <span className="inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-700 px-2 text-center text-xs font-bold text-white" aria-label={`Day ${day.day_number}`}>
+                                                        Day {day.day_number}
+                                                    </span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="break-words text-lg font-bold text-slate-900">{day.title}</h3>
+                                                        {day.location && <p className="mt-1 text-sm font-medium text-emerald-700">{day.location}</p>}
+                                                        {day.description && <p className="mt-3 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{day.description}</p>}
+                                                        {day.highlights.length > 0 && (
+                                                            <div className="mt-4">
+                                                                <h4 className="text-sm font-bold text-slate-800">Highlights</h4>
+                                                                <ul className="mt-2 flex flex-wrap gap-2" aria-label={`Day ${day.day_number} highlights`}>
+                                                                    {day.highlights.map((highlight, i) => <li key={`${i}-${highlight}`} className="break-words rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200">{highlight}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                        {(day.meals.length > 0 || day.overnight) && (
+                                                            <dl className="mt-4 grid gap-2 border-t border-slate-200 pt-3 text-sm text-slate-700 sm:grid-cols-2">
+                                                                {day.meals.length > 0 && <div><dt className="font-bold text-slate-900">Meals</dt><dd className="mt-1 break-words">{day.meals.join(', ')}</dd></div>}
+                                                                {day.overnight && <div><dt className="font-bold text-slate-900">Overnight</dt><dd className="mt-1 break-words">{day.overnight}</dd></div>}
+                                                            </dl>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </section>
+                            )}
+                            {tour.upcoming_departures.length > 0 && (
+                                <section id="tour-departures" aria-labelledby="departure-heading" className="mt-10 scroll-mt-24 border-t border-slate-100 pt-8">
+                                    <p className="text-xs font-bold uppercase tracking-[0.17em] text-emerald-700">Plan ahead</p>
+                                    <h2 id="departure-heading" className="mt-2 text-2xl font-bold text-slate-900">Upcoming departure dates</h2>
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">These dates are indicative, not a booking or a guarantee of seats. Confirm schedules and availability with our travel team.</p>
+                                    <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+                                        {tour.upcoming_departures.map((departure, index) => (
+                                            <li key={`${departure.starts_at_utc}-${index}`} className="min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
+                                                <h3 className="break-words text-base font-bold text-slate-900">{departure.name}</h3>
+                                                <p className="mt-2 text-sm font-semibold text-emerald-800">{formatDepartureTime(departure.starts_at_utc, departure.timezone)}</p>
+                                                {departure.ends_at_utc && <p className="mt-1 text-sm text-slate-600">Ends: {formatDepartureTime(departure.ends_at_utc, departure.timezone)}</p>}
+                                                <p className="mt-2 text-xs text-slate-500">Time zone: {departure.timezone}</p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <a href={tour.enquiry_url} className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-700 px-4 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Enquire about departures</a>
+                                </section>
+                            )}
+                            {tour.categories.length > 0 && (
+                                <section aria-label="Tour categories" className="mt-8">
+                                    <h2 className="text-lg font-bold text-slate-800">Experience type</h2>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {tour.categories.map((category) => (
+                                            <a key={category.slug} href={`/tours?category=${encodeURIComponent(category.slug)}`}
+                                                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-emerald-500 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">{category.name}</a>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+                        </div>
+                    </article>
+
+                    <aside id="tour-enquiry" aria-label="Tour enquiry" className="min-w-0 scroll-mt-24 rounded-2xl bg-white p-6 shadow-[0_10px_44px_rgba(14,34,39,0.06)] ring-1 ring-slate-100 lg:sticky lg:top-6">
+                        <h2 className="text-xl font-bold text-slate-900">Plan this journey</h2>
+                        <p className="mt-3 text-sm leading-6 text-slate-600">Our team can confirm travel arrangements, current departure options and an accurate price quotation for your request.</p>
+                        <div className="mt-6 rounded-lg bg-emerald-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900">Tour price</p>
+                            <p className="mt-1 text-xl font-bold text-emerald-800">On enquiry</p>
+                            <p className="mt-2 text-xs leading-5 text-emerald-900">No seat is reserved until the booking is reviewed and confirmed by staff.</p>
+                        </div>
+                        <a href={tour.enquiry_url} className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-5 py-3 text-center font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">
+                            Enquire Now <span aria-hidden="true">→</span>
+                        </a>
+                        <a href="/tours" className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Browse other tours</a>
+                    </aside>
+                </div>
+            </div>
+        </main>
+    );
+}
+
+PublicTourShow.layout = (page: ReactNode) => <PublicSiteLayout>{page}</PublicSiteLayout>;
