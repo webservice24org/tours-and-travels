@@ -32,3 +32,28 @@ require __DIR__ . '/bablys_admin_roles_ui.php';
 
 // Bablys P2B.5C â€” protected read-only audit viewer.
 require __DIR__ . '/bablys_admin_audit.php';
+
+// Bablys P3B.1 - protected Tour Categories JSON API.
+require __DIR__ . '/bablys_admin_tour_categories.php';
+
+// Bablys P3B.2 - protected Destinations JSON API.
+require __DIR__ . '/bablys_admin_destinations.php';
+
+// Bablys P3B.3 â€” authorized Tour Category React UI.
+require __DIR__ . '/bablys_admin_tour_categories_ui.php';
+
+// Bablys P3B.4 - protected Destination React UI.
+require __DIR__ . '/bablys_admin_destinations_ui.php';
+
+// Bablys P3B.5 â€” permission-aware, read-only admin navigation.
+require __DIR__ . '/bablys_admin_navigation.php';
+
+// Bablys P3D.1 - protected Tour Management JSON API.
+require __DIR__ . '/bablys_admin_tours.php';
+
+// Bablys P3D.2 â€” protected Tour Packages React UI.
+require __DIR__ . '/bablys_admin_tours_ui.php';
+require __DIR__.'/bablys_admin_tour_editorial.php';
+require __DIR__.'/bablys_admin_tour_itineraries.php';
+require __DIR__.'/bablys_admin_tour_pricing.php';
+require __DIR__.'/bablys_admin_tour_departures.php';

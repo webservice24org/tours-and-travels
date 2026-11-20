@@ -1,10 +1,12 @@
+import BablysAdminLayout from '@/layouts/bablys-admin-layout';
 import { Head, Link } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { confirmAction, toast } from '@/components/admin/feedback/admin-feedback';
 
 import { describeStaffError, StaffApiError, staffRequest } from '@/components/admin/staff-users/client';
 import type {
-    Notice, PageMeta, RoleOption, StaffApiResponse, StaffListResponse,
+    PageMeta, RoleOption, StaffApiResponse, StaffListResponse,
     StaffStatusFilter, StaffUser,
 } from '@/components/admin/staff-users/types';
 
@@ -51,7 +53,6 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
     const [meta, setMeta] = useState<PageMeta>(emptyMeta);
     const [loading, setLoading] = useState(true);
     const [listError, setListError] = useState('');
-    const [notice, setNotice] = useState<Notice | null>(null);
     const [drawer, setDrawer] = useState<Drawer>(null);
     const [draft, setDraft] = useState<StaffDraft>(emptyDraft);
     const [formErrors, setFormErrors] = useState<Record<string, string[]>>({});
@@ -111,7 +112,7 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
     function openCreate() {
         setDraft({ ...emptyDraft, role_keys: [] });
         setFormErrors({});
-        setNotice(null);
+        
         setDrawer({ mode: 'create' });
     }
 
@@ -119,7 +120,7 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
         if (!editable(user)) return;
         setDraft({ name: user.name, email: user.email, role_keys: [...user.role_keys] });
         setFormErrors({});
-        setNotice(null);
+        
         setDrawer({ mode: 'edit', user });
     }
 
@@ -137,26 +138,26 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
         if (!drawer || busy) return;
         setBusy(true);
         setFormErrors({});
-        setNotice(null);
+        
         try {
             if (drawer.mode === 'create') {
                 const result = await staffRequest<StaffApiResponse>(API, {
                     method: 'POST',
                     body: { name: draft.name.trim(), email: draft.email.trim(), role_keys: draft.role_keys },
                 });
-                setNotice({ kind: 'success', message: `${result.data.name} created as pending staff. Use “Send setup link” to invite them.` });
+                toast.success(`${result.data.name} created as pending staff. Use “Send setup link” to invite them.`);
             } else {
                 const result = await staffRequest<StaffApiResponse>(`${API}/${drawer.user.id}`, {
                     method: 'PUT',
                     body: { name: draft.name.trim(), email: draft.email.trim() },
                 });
-                setNotice({ kind: 'success', message: `${result.data.name}'s profile was updated.` });
+                toast.success(`${result.data.name}'s profile was updated.`);
             }
             setDrawer(null);
             await loadUsers();
         } catch (error) {
             if (error instanceof StaffApiError) setFormErrors(error.fields);
-            setNotice({ kind: 'error', message: describeStaffError(error) });
+            toast.error(describeStaffError(error));
         } finally {
             setBusy(false);
         }
@@ -165,20 +166,20 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
     async function saveRoles() {
         if (!drawer || drawer.mode !== 'edit' || busy) return;
         const user = drawer.user;
-        if (draft.role_keys.length === 0 && !window.confirm(`Remove all CMS roles from ${user.name}? This will revoke CMS access.`)) return;
+        if (draft.role_keys.length === 0 && !(await confirmAction({ title: 'Remove all CMS roles?', description: `Remove all CMS roles from ${user.name}? This will revoke CMS access.`, confirmLabel: 'Remove roles', tone: 'danger' }))) return;
         setBusy(true);
         setFormErrors({});
-        setNotice(null);
+        
         try {
             const result = await staffRequest<StaffApiResponse>(`${API}/${user.id}/roles`, {
                 method: 'PUT', body: { role_keys: draft.role_keys },
             });
-            setNotice({ kind: 'success', message: `Roles updated for ${result.data.name}.` });
+            toast.success(`Roles updated for ${result.data.name}.`);
             setDrawer({ mode: 'edit', user: result.data });
             await loadUsers();
         } catch (error) {
             if (error instanceof StaffApiError) setFormErrors(error.fields);
-            setNotice({ kind: 'error', message: describeStaffError(error) });
+            toast.error(describeStaffError(error));
         } finally {
             setBusy(false);
         }
@@ -188,17 +189,17 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
         if (!editable(user) || user.role_keys.length === 0 || pendingId !== null) return;
         const enabled = !user.cms_staff_enabled;
         const action = enabled ? 'restore' : 'suspend';
-        if (!window.confirm(`Are you sure you want to ${action} CMS access for ${user.name}?`)) return;
+        if (!(await confirmAction({ title: `${enabled ? 'Restore' : 'Suspend'} CMS access?`, description: `Are you sure you want to ${action} CMS access for ${user.name}?`, confirmLabel: enabled ? 'Restore access' : 'Suspend access', tone: enabled ? 'normal' : 'danger' }))) return;
         setPendingId(user.id);
-        setNotice(null);
+        
         try {
             await staffRequest<StaffApiResponse>(`${API}/${user.id}/access`, {
                 method: 'PATCH', body: { enabled },
             });
-            setNotice({ kind: 'success', message: `${user.name}'s CMS access was ${enabled ? 'restored' : 'suspended'}.` });
+            toast.success(`${user.name}'s CMS access was ${enabled ? 'restored' : 'suspended'}.`);
             await loadUsers();
         } catch (error) {
-            setNotice({ kind: 'error', message: describeStaffError(error) });
+            toast.error(describeStaffError(error));
         } finally {
             setPendingId(null);
         }
@@ -206,14 +207,14 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
 
     async function sendSetupLink(user: StaffUser) {
         if (!canInvite(user) || pendingId !== null) return;
-        if (!window.confirm(`Send a one-time password setup link to ${user.email}? Ensure the mail configuration is correct.`)) return;
+        if (!(await confirmAction({ title: 'Send staff setup link?', description: `Send a one-time password setup link to ${user.email}? Ensure the mail configuration is correct.`, confirmLabel: 'Send setup link', tone: 'warning' }))) return;
         setPendingId(user.id);
-        setNotice(null);
+        
         try {
             const result = await staffRequest<{ message: string }>(`${API}/${user.id}/setup-link`, { method: 'POST', body: {} });
-            setNotice({ kind: 'success', message: result.message });
+            toast.success(result.message);
         } catch (error) {
-            setNotice({ kind: 'error', message: describeStaffError(error) });
+            toast.error(describeStaffError(error));
         } finally {
             setPendingId(null);
         }
@@ -222,7 +223,7 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
     return (
         <>
             <Head title="Staff users · Bablys CMS" />
-            <main className="min-h-screen min-w-0 bg-slate-50 text-slate-900">
+            <BablysAdminLayout>
                 <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
                     <header className="flex flex-wrap items-start justify-between gap-4">
                         <div className="min-w-0">
@@ -239,12 +240,6 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
                     <section className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" aria-label="Security guidance">
                         New staff receive no shared password. Create a pending account, then send a password setup link. They must also verify their email before receiving CMS access. Super Administrator accounts cannot be modified here.
                     </section>
-
-                    {notice && (
-                        <div className={`mt-5 rounded-lg border px-4 py-3 text-sm ${notice.kind === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`} role="status" aria-live="polite">
-                            {notice.message}
-                        </div>
-                    )}
 
                     <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="User filters">
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -329,7 +324,7 @@ export default function CmsStaffUsersIndex({ viewerId, roleOptions }: Props) {
                     </section>
                     <p className="mt-5 text-xs text-slate-500">P2B.3B · Staff management UI · Sensitive changes are server-validated. Activity logging will be added in P2B.5.</p>
                 </div>
-            </main>
+            </BablysAdminLayout>
 
             {drawer && (
                 <div className="fixed inset-0 z-50 flex items-start justify-end bg-slate-950/50" role="presentation">

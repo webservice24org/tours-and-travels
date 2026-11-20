@@ -1,3 +1,4 @@
+import BablysAdminLayout from '@/layouts/bablys-admin-layout';
 import { Head, Link } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -148,7 +149,7 @@ export default function CmsAuditLogsIndex() {
     return (
         <>
             <Head title="Bablys CMS · Audit logs" />
-            <main className="min-h-screen min-w-0 bg-slate-50 text-slate-900">
+            <BablysAdminLayout>
                 <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
@@ -255,7 +256,7 @@ export default function CmsAuditLogsIndex() {
                     {details && <div className="mt-6"><EventDetail event={details} onClose={() => setDetails(null)} /></div>}
                     <p className="mt-6 text-xs text-slate-500">Audit history is append-only through normal CMS operations. Production immutability and retention require separate database and infrastructure controls.</p>
                 </div>
-            </main>
+            </BablysAdminLayout>
         </>
     );
 }

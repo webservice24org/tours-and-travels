@@ -1,3 +1,4 @@
+import BablysAdminLayout from '@/layouts/bablys-admin-layout';
 import { Head, Link } from '@inertiajs/react';
 
 interface AdminLandingProps {
@@ -30,7 +31,7 @@ export default function BablysAdminIndex({ staff, roles, permissions }: AdminLan
     return (
         <>
             <Head title="Bablys CMS · Admin" />
-            <main className="min-h-screen bg-slate-50 text-slate-900">
+            <BablysAdminLayout>
                 <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -72,7 +73,7 @@ export default function BablysAdminIndex({ staff, roles, permissions }: AdminLan
                     </section>
                     <footer className="mt-8 text-xs text-slate-500">P2B.2 security milestone · No live CMS content can be edited from this page yet.</footer>
                 </div>
-            </main>
+            </BablysAdminLayout>
         </>
     );
 }

@@ -1,6 +1,8 @@
+import BablysAdminLayout from '@/layouts/bablys-admin-layout';
 import { Head, Link } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { confirmAction, toast } from '@/components/admin/feedback/admin-feedback';
 
 import { CmsRoleApiError, roleErrorMessage, roleRequest } from '@/components/admin/roles/client';
 import type {
@@ -13,7 +15,6 @@ const emptyMeta: PaginationMeta = { current_page: 1, last_page: 1, per_page: 20,
 const input = 'mt-1 block w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-100';
 const primary = 'inline-flex items-center justify-center rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50';
 const secondary = 'inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
-type Notice = { kind: 'success' | 'error'; message: string };
 type Draft = { key: string; name: string; description: string; permission_keys: string[] };
 type Drawer = { mode: 'create' } | { mode: 'edit'; role: CmsRole } | null;
 const newDraft = (): Draft => ({ key: 'custom_', name: '', description: '', permission_keys: [] });
@@ -96,7 +97,6 @@ export default function CmsRolesIndex() {
     const [catalog, setCatalog] = useState<PermissionDefinition[]>([]);
     const [loading, setLoading] = useState(true);
     const [listError, setListError] = useState('');
-    const [notice, setNotice] = useState<Notice | null>(null);
     const [drawer, setDrawer] = useState<Drawer>(null);
     const [draft, setDraft] = useState<Draft>(newDraft);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -152,23 +152,23 @@ export default function CmsRolesIndex() {
     }, [busy, drawer]);
 
     function openCreate() {
-        setErrors({}); setNotice(null); setDraft(newDraft()); setDrawer({ mode: 'create' });
+        setErrors({});  setDraft(newDraft()); setDrawer({ mode: 'create' });
     }
     function openEdit(role: CmsRole) {
         if (!role.can_edit || role.is_system) return;
-        setErrors({}); setNotice(null);
+        setErrors({}); 
         setDraft({ key: role.key, name: role.name, description: role.description ?? '', permission_keys: [...role.permission_keys] });
         setDrawer({ mode: 'edit', role });
     }
     function errorFrom(error: unknown) {
         if (error instanceof CmsRoleApiError) setErrors(error.fields);
-        setNotice({ kind: 'error', message: roleErrorMessage(error) });
+        toast.error(roleErrorMessage(error));
     }
 
     async function submitDetails(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!drawer || busy) return;
-        setBusy(true); setNotice(null); setErrors({});
+        setBusy(true);  setErrors({});
         try {
             if (drawer.mode === 'create') {
                 const result = await roleRequest<RoleResponse>(API, {
@@ -176,13 +176,13 @@ export default function CmsRolesIndex() {
                     body: { key: draft.key.trim(), name: draft.name.trim(), description: draft.description.trim() || null,
                         permission_keys: draft.permission_keys },
                 });
-                setNotice({ kind: 'success', message: `${result.data.name} created. You can assign it from Staff Users.` });
+                toast.success(`${result.data.name} created. You can assign it from Staff Users.`);
                 setType('custom'); setPage(1); setSearch('');
             } else {
                 const result = await roleRequest<RoleResponse>(`${API}/${drawer.role.id}`, {
                     method: 'PUT', body: { name: draft.name.trim(), description: draft.description.trim() || null },
                 });
-                setNotice({ kind: 'success', message: `${result.data.name} updated.` });
+                toast.success(`${result.data.name} updated.`);
             }
             setDrawer(null);
             await refresh();
@@ -192,14 +192,14 @@ export default function CmsRolesIndex() {
 
     async function savePermissions() {
         if (!drawer || drawer.mode !== 'edit' || busy) return;
-        if (!draft.permission_keys.length && !window.confirm(`Remove all permissions from ${drawer.role.name}? Assigned users will lose those capabilities immediately.`)) return;
-        setBusy(true); setNotice(null); setErrors({});
+        if (!draft.permission_keys.length && !(await confirmAction({ title: 'Remove all permissions?', description: `Remove all permissions from ${drawer.role.name}? Assigned users will lose those capabilities immediately.`, confirmLabel: 'Remove permissions', tone: 'danger' }))) return;
+        setBusy(true);  setErrors({});
         try {
             const result = await roleRequest<RoleResponse>(`${API}/${drawer.role.id}/permissions`, {
                 method: 'PUT', body: { permission_keys: draft.permission_keys },
             });
             setDrawer({ mode: 'edit', role: result.data });
-            setNotice({ kind: 'success', message: `Permissions updated for ${result.data.name}.` });
+            toast.success(`Permissions updated for ${result.data.name}.`);
             await refresh();
         } catch (error) { errorFrom(error); }
         finally { setBusy(false); }
@@ -207,20 +207,20 @@ export default function CmsRolesIndex() {
 
     async function deleteRole(role: CmsRole) {
         if (!role.can_edit || role.is_system || role.user_count > 0 || deletingId !== null) return;
-        if (!window.confirm(`Delete ${role.name} (${role.key})? This cannot be undone.`)) return;
-        setDeletingId(role.id); setNotice(null);
+        if (!(await confirmAction({ title: 'Delete custom role?', description: `Delete ${role.name} (${role.key})? This cannot be undone.`, confirmLabel: 'Delete role', tone: 'danger' }))) return;
+        setDeletingId(role.id); 
         try {
             await roleRequest<void>(`${API}/${role.id}`, { method: 'DELETE' });
-            setNotice({ kind: 'success', message: `${role.name} deleted.` });
+            toast.success(`${role.name} deleted.`);
             await refresh();
-        } catch (error) { setNotice({ kind: 'error', message: roleErrorMessage(error) }); }
+        } catch (error) { toast.error(roleErrorMessage(error)); }
         finally { setDeletingId(null); }
     }
 
     return (
         <>
             <Head title="Roles & permissions · Bablys CMS" />
-            <main className="min-h-screen min-w-0 bg-slate-50 text-slate-900">
+            <BablysAdminLayout>
                 <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
                     <header className="flex flex-wrap items-start justify-between gap-4">
                         <div className="min-w-0">
@@ -238,7 +238,6 @@ export default function CmsRolesIndex() {
                     <section aria-label="Permission safeguards" className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                         System roles cannot be edited here. Owner-only grants (role management, global settings and audit access) cannot be assigned to custom roles. Changes to permissions take effect at the next authorization check.
                     </section>
-                    {notice && <div className={`mt-5 rounded-lg border px-4 py-3 text-sm ${notice.kind === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`} role="status" aria-live="polite">{notice.message}</div>}
 
                     <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Role filters">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -301,7 +300,7 @@ export default function CmsRolesIndex() {
                     </section>
                     <p className="mt-5 text-xs text-slate-500">P2B.4B · Role UI and staff role integration · Audit logging follows in P2B.5.</p>
                 </div>
-            </main>
+            </BablysAdminLayout>
 
             {drawer && <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/50" role="presentation">
                 <section role="dialog" aria-modal="true" aria-labelledby="role-dialog-title" className="flex h-full w-full max-w-3xl flex-col overflow-y-auto bg-white p-4 shadow-xl sm:p-7">

@@ -11,3 +11,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+require __DIR__.'/bablys_public_booking_requests.php';
+require __DIR__.'/bablys_admin_booking_requests.php';
+require __DIR__.'/bablys_booking_quote_approvals.php';
