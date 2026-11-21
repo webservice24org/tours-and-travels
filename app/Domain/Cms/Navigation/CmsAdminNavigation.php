@@ -46,6 +46,21 @@ final class CmsAdminNavigation
 
         // P3D.2: append Tour Packages using the user's current database-backed permission.
         // Keep this independent of taxonomy.manage: roles may have tours.view alone.
+        // P4A.5 GLOBAL-SETTINGS-SUBMENU: use existing permission-filtered admin sidebar.
+        if (isset($granted['settings.manage'])) {
+            $groups[] = [
+                'key' => 'bablys-global-settings',
+                'title' => 'Global settings',
+                'links' => [
+                    ['label' => 'Overview', 'href' => '/admin/global-settings'],
+                    ['label' => 'Header', 'href' => '/admin/global-settings/header'],
+                    ['label' => 'Footer', 'href' => '/admin/global-settings/footer'],
+                    ['label' => 'Site settings', 'href' => '/admin/site-settings'],
+                    ['label' => 'Navigation menus', 'href' => '/admin/navigation-menus'],
+                    ['label' => 'Publishing & history', 'href' => '/admin/cms-publishing'],
+                ],
+            ];
+        }
         if (isset($granted['tours.view'])) {
             $groups[] = [
                 'key' => 'tour-packages',
