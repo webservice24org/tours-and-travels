@@ -16,3 +16,12 @@ require __DIR__ . '/bablys_admin_booking_requests.php';
 require __DIR__ . '/bablys_booking_quote_approvals.php';
 
 require __DIR__ . '/bablys_public_tours.php';
+
+// P3H.1 senior-staff read-only bookings
+require __DIR__.'/bablys_admin_bookings.php';
+
+// P3H.2 authorized booking operations
+require __DIR__.'/bablys_admin_booking_actions.php';
+
+// P3H.4 authorized booking operations
+require __DIR__.'/bablys_customer_account.php';

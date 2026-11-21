@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { useRef, useState, type KeyboardEvent, type PropsWithChildren } from 'react';
 
 /**
@@ -8,6 +8,10 @@ import { useRef, useState, type KeyboardEvent, type PropsWithChildren } from 're
  */
 export default function PublicSiteLayout({ children }: PropsWithChildren) {
     const [menuOpen, setMenuOpen] = useState(false);
+    // The account route itself enforces auth + verified email. Do not trust
+    // shared Inertia props for authorization; they only affect link labels.
+    const shared = usePage().props as { auth?: { user?: { id?: number } | null } };
+    const signedIn = Boolean(shared.auth?.user);
     const menuToggleRef = useRef<HTMLButtonElement>(null);
 
     function onMobileNavigationKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -45,6 +49,7 @@ export default function PublicSiteLayout({ children }: PropsWithChildren) {
                     <nav aria-label="Desktop website navigation" className="hidden items-center gap-2 md:flex">
                         <Link href="/" className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Home</Link>
                         <Link href="/tours" className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Explore Tours</Link>
+                        <Link href="/account/travel" className="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">{signedIn ? 'My Account' : 'Account / Login'}</Link>
                         <Link href="/tours" className="inline-flex min-h-11 items-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">Find a Tour</Link>
                     </nav>
                 </div>
@@ -57,6 +62,7 @@ export default function PublicSiteLayout({ children }: PropsWithChildren) {
                     <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-1">
                         <Link href="/" onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center rounded-lg px-4 py-3 text-base font-semibold text-slate-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Home</Link>
                         <Link href="/tours" onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center rounded-lg px-4 py-3 text-base font-semibold text-slate-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">Explore Tours</Link>
+                        <Link href="/account/travel" onClick={() => setMenuOpen(false)} className="flex min-h-12 items-center rounded-lg px-4 py-3 text-base font-semibold text-slate-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">{signedIn ? 'My Account' : 'Account / Login'}</Link>
                     </div>
                 </nav>
             </header>

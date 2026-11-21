@@ -12,9 +12,10 @@ use Illuminate\Database\Eloquent\Builder;
  * Public read-only itinerary and upcoming departure preview for a tour that
  * has ALREADY passed Tour::publiclyAvailable(). Never call this for drafts.
  *
- * Departure records are staff inventory. Only an allowlisted, limited set of
- * nonbinding date labels is returned. Never publish capacity, seat counts,
- * booking close timestamps, row IDs, codes, internal notes or meeting points.
+ * Departure records contain staff inventory. P3H.3 deliberately publishes a
+ * bounded, aggregate-only seat summary alongside safe public dates; never
+ * expose raw committed inventory, row IDs, codes, booking close timestamps,
+ * private traveler information, notes or meeting points.
  */
 final class PublishedTourSchedule
 {
@@ -58,7 +59,7 @@ final class PublishedTourSchedule
     }
 
     /**
-     * @return list<array{name:string,starts_at_utc:string,ends_at_utc:?string,timezone:string}>
+     * @return list<array{name:string,starts_at_utc:string,ends_at_utc:?string,timezone:string,seat_summary:array{total_seats:int,confirmed_seats:int,confirmed_bookings:int,pending_seats:int,pending_bookings:int,other_committed_seats:int,available_seats:int}}>
      */
     public function upcomingFor(int $publishedTourId): array
     {
@@ -78,8 +79,9 @@ final class PublishedTourSchedule
             ->orderBy('starts_at')
             ->orderBy('id')
             ->limit(self::MAX_UPCOMING)
-            ->get(['name', 'starts_at', 'ends_at', 'timezone_name']);
+            ->get(['id', 'name', 'starts_at', 'ends_at', 'timezone_name', 'capacity_total', 'seats_committed']);
 
+        $seatSummaries = app(PublicTourSeatAvailability::class)->forDepartures($rows);
         $departures = [];
         foreach ($rows as $row) {
             // The migration stores UTC timestamps as SQL DATETIME strings; do
@@ -90,6 +92,7 @@ final class PublishedTourSchedule
                 'starts_at_utc' => self::utcIso((string) $row->starts_at),
                 'ends_at_utc' => $row->ends_at === null ? null : self::utcIso((string) $row->ends_at),
                 'timezone' => (string) $row->timezone_name,
+                'seat_summary' => $seatSummaries[(int) $row->getKey()],
             ];
         }
 

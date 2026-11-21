@@ -1,11 +1,9 @@
-import type { ReactNode } from 'react';
-import PublicSiteLayout from '../../../layouts/public-site-layout';
-
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
 import { type BookingRequestView, when } from '../../public/booking-requests/http';
 import QuoteApprovalPanel from '@/components/public/booking-requests/QuoteApprovalPanel';
+import CustomerTravelLayout from '@/layouts/customer-travel-layout';
 
 export default function CustomerBookingRequests({ requests }: { requests: BookingRequestView[]; nonbinding: true }) {
     const [busy, setBusy] = useState<string | null>(null);
@@ -16,10 +14,10 @@ export default function CustomerBookingRequests({ requests }: { requests: Bookin
             preserveScroll: true, onFinish: () => setBusy(null),
         });
     }
-    return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:py-12">
+    return <CustomerTravelLayout>
         <Head title="My booking requests | Bablys Tours & Travels" />
         <div className="mx-auto max-w-4xl">
-            <Link href="/tours" className="text-sm font-semibold text-teal-800 hover:underline">Browse tours</Link>
+            <Link href="/account/travel" className="text-sm font-semibold text-teal-800 hover:underline">Back to account overview</Link>
             <h1 className="mt-4 text-3xl font-bold">My booking requests</h1>
             <p className="mt-3 text-sm text-slate-600">Booking requests are nonbinding. Staff must recheck current pricing and available seats before converting a request into a booking.</p>
             {requests.length === 0 ? <div className="mt-7 rounded-xl bg-white p-6 text-slate-600">You have not submitted any booking requests.</div>
@@ -29,11 +27,9 @@ export default function CustomerBookingRequests({ requests }: { requests: Bookin
                     <p className="mt-1 text-sm text-slate-700">{row.departure_name} · {when(row.departure_starts_at_utc)}</p>
                     <p className="mt-1 text-sm text-slate-700">{row.adults} adult(s), {row.children} child(ren) · {row.variant_code}</p>
                     {row.status === 'verified' && <QuoteApprovalPanel reference={row.reference} />}
+                    {row.has_booking && <p className="mt-3 text-sm font-semibold text-emerald-800">This request has been converted into a booking. <Link href="/account/bookings" className="underline">View my bookings</Link>.</p>}
                     {row.can_withdraw && <button type="button" onClick={() => withdraw(row)} disabled={busy !== null} className="mt-4 rounded-lg border border-red-600 px-3 py-2 text-sm font-semibold text-red-800 disabled:opacity-50">{busy === row.reference ? 'Processing…' : 'Withdraw request'}</button>}
                 </article>)}</div>}
         </div>
-    </main>;
+    </CustomerTravelLayout>;
 }
-
-// Public enquiry/customer request pages never inherit the CMS/dashboard sidebar.
-CustomerBookingRequests.layout = (page: ReactNode) => <PublicSiteLayout>{page}</PublicSiteLayout>;

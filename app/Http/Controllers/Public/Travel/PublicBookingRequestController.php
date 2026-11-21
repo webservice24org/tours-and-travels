@@ -8,6 +8,7 @@ use App\Domain\Cms\Enums\PublicationStatus;
 use App\Domain\Travel\Bookings\TourBookingReadiness;
 use App\Domain\Travel\Bookings\TourBookingRequestManager;
 use App\Domain\Travel\Bookings\TourBookingRequestPresentation;
+use App\Domain\Travel\Tours\PublicTourSeatAvailability;
 use App\Http\Controllers\Controller;
 use App\Mail\GuestBookingRequestLinksMail;
 use App\Models\Travel\Tour;
@@ -56,7 +57,8 @@ final class PublicBookingRequestController extends Controller
             })
             ->whereColumn('capacity_total', '>', 'seats_committed')
             ->orderBy('starts_at')->orderBy('id')->limit(100)
-            ->get(['id', 'name', 'starts_at', 'timezone_name']);
+            ->get(['id', 'name', 'starts_at', 'timezone_name', 'capacity_total', 'seats_committed']);
+        $seatSummaries = app(PublicTourSeatAvailability::class)->forDepartures($departures);
 
         // Tour detail links carry only a public UTC date hint, never inventory identifiers.
         // Compare it solely against this tour's currently requestable departure options.
@@ -87,6 +89,7 @@ final class PublicBookingRequestController extends Controller
             'departures' => $departures->map(static fn (TourDeparture $row): array => [
                 'id' => (int) $row->getKey(), 'name' => (string) $row->name,
                 'starts_at' => (string) $row->starts_at, 'timezone' => (string) $row->timezone_name,
+                'seat_summary' => $seatSummaries[(int) $row->getKey()],
             ])->all(),
             'variants' => $variants->map(static fn (TourPriceVariant $row): array => [
                 'code' => (string) $row->code, 'name' => (string) $row->name,

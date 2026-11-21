@@ -2,6 +2,16 @@ import { Head } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import PublicSiteLayout from '../../../layouts/public-site-layout';
 
+type SeatSummary = {
+    total_seats: number;
+    confirmed_seats: number;
+    confirmed_bookings: number;
+    pending_seats: number;
+    pending_bookings: number;
+    other_committed_seats: number;
+    available_seats: number;
+};
+
 type Tour = {
     title: string;
     slug: string;
@@ -20,6 +30,7 @@ type Tour = {
         highlights: string[];
     }[];
     upcoming_departures: {
+        seat_summary: SeatSummary;
         name: string;
         starts_at_utc: string;
         ends_at_utc: string | null;
@@ -262,7 +273,7 @@ export default function PublicTourShow({ tour }: Props) {
                                 <section id="tour-departures" aria-labelledby="departure-heading" className="mt-10 scroll-mt-24 border-t border-slate-100 pt-8">
                                     <p className="text-xs font-bold uppercase tracking-[0.17em] text-emerald-700">Plan ahead</p>
                                     <h2 id="departure-heading" className="mt-2 text-2xl font-bold text-slate-900">Upcoming departure dates</h2>
-                                    <p className="mt-2 text-sm leading-6 text-slate-600">These dates are indicative, not a booking or a guarantee of seats. Confirm schedules and availability with our travel team.</p>
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">Seat counts are snapshots, not a booking or a guarantee of seats. Staff must confirm availability and pricing before any booking.</p>
                                     <ul className="mt-5 grid gap-3 sm:grid-cols-2">
                                         {tour.upcoming_departures.map((departure, index) => (
                                             <li key={`${departure.starts_at_utc}-${index}`} className="min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
@@ -270,13 +281,25 @@ export default function PublicTourShow({ tour }: Props) {
                                                 <p className="mt-2 text-sm font-semibold text-emerald-800">{formatDepartureTime(departure.starts_at_utc, departure.timezone)}</p>
                                                 {departure.ends_at_utc && <p className="mt-1 text-sm text-slate-600">Ends: {formatDepartureTime(departure.ends_at_utc, departure.timezone)}</p>}
                                                 <p className="mt-2 text-xs text-slate-500">Time zone: {departure.timezone}</p>
-                                                <a
-                                                    href={`${tour.enquiry_url}?departure_at=${encodeURIComponent(departure.starts_at_utc)}`}
-                                                    aria-label={`Enquire about ${departure.name} on ${formatDepartureTime(departure.starts_at_utc, departure.timezone)}`}
-                                                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                                                >
-                                                    Enquire about this date
-                                                </a>
+                                                <div className="mt-3 rounded-lg border border-emerald-100 bg-white p-3" aria-label={`Seat availability for ${departure.name}`}>
+                                                    <dl className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                                                        <div><dt className="text-slate-600">Total seats</dt><dd className="font-bold tabular-nums">{departure.seat_summary.total_seats}</dd></div>
+                                                        <div><dt className="text-slate-600">Confirmed seats</dt><dd className="font-bold tabular-nums">{departure.seat_summary.confirmed_seats}</dd></div>
+                                                        <div><dt className="text-slate-600">Pending seats</dt><dd className="font-bold tabular-nums">{departure.seat_summary.pending_seats}</dd></div>
+                                                        <div><dt className="text-emerald-800">Available seats</dt><dd className="font-bold tabular-nums text-emerald-800">{departure.seat_summary.available_seats}</dd></div>
+                                                    </dl>
+                                                    <p className="mt-2 text-xs text-slate-600">{departure.seat_summary.confirmed_bookings} confirmed booking(s); {departure.seat_summary.pending_bookings} pending booking(s).</p>
+                                                    {departure.seat_summary.other_committed_seats > 0 && <p className="mt-1 text-xs text-slate-600">Other committed inventory: {departure.seat_summary.other_committed_seats} seat(s).</p>}
+                                                </div>
+                                                {departure.seat_summary.available_seats > 0 ? (
+                                                    <a
+                                                        href={`${tour.enquiry_url}?departure_at=${encodeURIComponent(departure.starts_at_utc)}`}
+                                                        aria-label={`Enquire about ${departure.name} on ${formatDepartureTime(departure.starts_at_utc, departure.timezone)}`}
+                                                        className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                                                    >
+                                                        Enquire about this date
+                                                    </a>
+                                                ) : <p role="status" className="mt-3 text-sm font-semibold text-rose-700">Currently fully booked</p>}
                                             </li>
                                         ))}
                                     </ul>

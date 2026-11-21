@@ -8,13 +8,13 @@ use App\Domain\Cms\Enums\PublicationStatus;
 use App\Models\Travel\Tour;
 
 /**
- * P3F.3C public tour detail. No staff-only inventory, prices,
- * booking references, capacity or private media exposed.
+ * Public tour detail. Aggregate-only public P3H.3 seat summaries are allowed;
+ * raw staff inventory, booking references, private media and PII remain hidden.
  */
 final class PublishedTourDetail
 {
     /**
-     * @return array{title:string,slug:string,summary:?string,duration_days:int,is_featured:bool,cover_image:?array{src:string,alt:string,width:int,height:int},gallery:list<array{src:string,alt:string,width:int,height:int}>,itinerary:list<array{day_number:int,title:string,location:?string,description:?string,overnight:?string,meals:list<string>,highlights:list<string>}>,upcoming_departures:list<array{name:string,starts_at_utc:string,ends_at_utc:?string,timezone:string}>,destinations:list<array{name:string,slug:string}>,categories:list<array{name:string,slug:string}>,canonical_url:string,enquiry_url:string}|null
+     * @return array{title:string,slug:string,summary:?string,duration_days:int,is_featured:bool,cover_image:?array{src:string,alt:string,width:int,height:int},gallery:list<array{src:string,alt:string,width:int,height:int}>,itinerary:list<array{day_number:int,title:string,location:?string,description:?string,overnight:?string,meals:list<string>,highlights:list<string>}>,upcoming_departures:list<array{name:string,starts_at_utc:string,ends_at_utc:?string,timezone:string,seat_summary:array{total_seats:int,confirmed_seats:int,confirmed_bookings:int,pending_seats:int,pending_bookings:int,other_committed_seats:int,available_seats:int}}>,destinations:list<array{name:string,slug:string}>,categories:list<array{name:string,slug:string}>,canonical_url:string,enquiry_url:string}|null
      */
     public function find(string $slug): ?array
     {

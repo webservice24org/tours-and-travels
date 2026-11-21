@@ -18,7 +18,6 @@ final class PublicBookingEnquiryJourneyTest extends TourBookingQaTestCase
             'public/booking-requests/submitted.tsx' => 'BookingRequestSubmitted',
             'public/booking-requests/verify.tsx' => 'VerifyBookingRequest',
             'public/booking-requests/manage.tsx' => 'GuestBookingRequestManage',
-            'account/booking-requests/index.tsx' => 'CustomerBookingRequests',
         ] as $page => $component) {
             $source = file_get_contents(base_path('resources/js/pages/'.$page));
             self::assertIsString($source, $page);
@@ -27,6 +26,25 @@ final class PublicBookingEnquiryJourneyTest extends TourBookingQaTestCase
             self::assertStringNotContainsString('AppSidebar', $source, $page);
             self::assertStringNotContainsString('AppLayout', $source, $page);
         }
+
+        // P3H.4: the customer request screen uses an account shell which
+        // wraps the same sidebar-free public site layout. Do not require a
+        // direct PublicSiteLayout import on this one account page.
+        $page = 'account/booking-requests/index.tsx';
+        $source = file_get_contents(base_path('resources/js/pages/'.$page));
+        self::assertIsString($source, $page);
+        self::assertStringContainsString('CustomerTravelLayout', $source, $page);
+        self::assertStringContainsString('<CustomerTravelLayout>', $source, $page);
+        self::assertStringContainsString('<QuoteApprovalPanel', $source, $page);
+        self::assertStringNotContainsString('AppSidebar', $source, $page);
+        self::assertStringNotContainsString('AppLayout', $source, $page);
+
+        $shell = file_get_contents(base_path('resources/js/layouts/customer-travel-layout.tsx'));
+        self::assertIsString($shell);
+        self::assertStringContainsString('PublicSiteLayout', $shell);
+        self::assertStringContainsString('<PublicSiteLayout>', $shell);
+        self::assertStringNotContainsString('AppSidebar', $shell);
+        self::assertStringNotContainsString('AppLayout', $shell);
     }
 
     public function test_published_tour_detail_connects_to_its_nonbinding_enquiry_form(): void

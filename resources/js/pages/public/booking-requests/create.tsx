@@ -6,9 +6,19 @@ import { useRef, useState, type FormEvent } from 'react';
 
 import { bookingPost } from './http';
 
+type SeatSummary = {
+    total_seats: number;
+    confirmed_seats: number;
+    confirmed_bookings: number;
+    pending_seats: number;
+    pending_bookings: number;
+    other_committed_seats: number;
+    available_seats: number;
+};
+
 type Props = {
     tour: { id: number; title: string; slug: string };
-    departures: { id: number; name: string; starts_at: string; timezone: string }[];
+    departures: { id: number; name: string; starts_at: string; timezone: string; seat_summary: SeatSummary }[];
     variants: { code: string; name: string; currency: string }[];
     customer: { name: string; email: string; email_verified: boolean } | null;
     nonbinding: true; submission_id: string;
@@ -113,9 +123,19 @@ export default function CreateBookingRequest({ tour, departures, variants, custo
                     <div className="sm:col-span-2"><label className={label} htmlFor="departure">Departure</label>
                         <select id="departure" className={field} aria-invalid={Boolean(form.errors.departure_id)} aria-describedby={[selectionNotice ? 'departure-selection-notice' : '', selectedDeparture ? 'departure-context' : '', form.errors.departure_id ? 'departure-error' : ''].filter(Boolean).join(' ') || undefined} value={form.data.departure_id} onChange={(e) => { form.setData('departure_id', Number(e.target.value)); setQuote(null); setQuoteError(''); setSelectionNotice(''); }} disabled={disabled} required>
                             <option value={0} disabled>Choose an available departure</option>
-                            {departures.map((d) => <option key={d.id} value={d.id}>{d.name} · {d.starts_at} UTC ({d.timezone})</option>)}
+                            {departures.map((d) => <option key={d.id} value={d.id}>{d.name} · {d.starts_at} UTC ({d.timezone}) · {d.seat_summary.available_seats} seats available</option>)}
                         </select>
-                        {selectedDeparture && <p id="departure-context" aria-live="polite" className="mt-2 text-sm text-teal-900">Enquiry preference: {selectedDeparture.name} · {selectedDeparture.starts_at} UTC ({selectedDeparture.timezone}). No seat is reserved.</p>}
+                        {selectedDeparture && <div id="departure-context" aria-live="polite" className="mt-2 rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-950">
+                            <p>Enquiry preference: {selectedDeparture.name} · {selectedDeparture.starts_at} UTC ({selectedDeparture.timezone}). No seat is reserved.</p>
+                            <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <div><dt>Total seats</dt><dd className="font-bold tabular-nums">{selectedDeparture.seat_summary.total_seats}</dd></div>
+                                <div><dt>Confirmed seats</dt><dd className="font-bold tabular-nums">{selectedDeparture.seat_summary.confirmed_seats}</dd></div>
+                                <div><dt>Pending seats</dt><dd className="font-bold tabular-nums">{selectedDeparture.seat_summary.pending_seats}</dd></div>
+                                <div><dt>Available seats</dt><dd className="font-bold tabular-nums">{selectedDeparture.seat_summary.available_seats}</dd></div>
+                            </dl>
+                            <p className="mt-2 text-xs">{selectedDeparture.seat_summary.confirmed_bookings} confirmed booking(s), {selectedDeparture.seat_summary.pending_bookings} pending booking(s). Counts may change before staff review.</p>
+                            {selectedDeparture.seat_summary.other_committed_seats > 0 && <p className="mt-1 text-xs">Other inventory commitments: {selectedDeparture.seat_summary.other_committed_seats} seat(s).</p>}
+                        </div>}
                         {form.errors.departure_id && <p id="departure-error" className="mt-1 text-sm text-red-700">{form.errors.departure_id}</p>}
                     </div>
                     <div className="sm:col-span-2"><label className={label} htmlFor="option">Pricing option</label>

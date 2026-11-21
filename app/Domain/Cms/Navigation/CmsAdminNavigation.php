@@ -52,6 +52,11 @@ final class CmsAdminNavigation
                 'title' => 'Tour management',
                 'links' => [
                     ['label' => 'Tour packages', 'href' => '/admin/tours'],
+                    // P3H.5 BOOKING-SUBMENU: booking pages require BOTH travel permissions.
+                    ...(isset($granted['tours.edit'], $granted['tours.publish']) ? [
+                        ['label' => 'Booking requests', 'href' => '/admin/booking-requests'],
+                        ['label' => 'Bookings', 'href' => '/admin/bookings'],
+                    ] : []),
                 ],
             ];
         }
